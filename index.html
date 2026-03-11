@@ -2,12 +2,11 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta property="og:image" content="https://dominicmoomba19-blip.github.io/sda-church-portal/seventh-day-adventist-church.jpg">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>SDA Church Portal Zambia | Devotionals, Live Worship & Church Updates</title>
+<title>SDA Church Portal · Zambia</title>
 <link rel="canonical" href="./">
 <meta name="application-name" content="SDA Portal Zambia">
-<meta name="description" content="Official Seventh-day Adventist Church Portal for Zambia. Access devotionals, church activities, live stream worship, prayer requests and spiritual resources.">
+<meta name="description" content="Seventh-day Adventist Church Portal for Zambia — Activities, Devotionals, Live Stream, Prayer and Resources.">
 <meta name="theme-color" content="#b8822a">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -966,6 +965,14 @@ textarea.finp { resize:vertical; min-height:90px; }
 .fb-user-badge { display:inline-flex; align-items:center; gap:6px; background:rgba(26,122,80,.15); border:1px solid rgba(48,228,122,.2); border-radius:20px; padding:4px 12px 4px 8px; font-size:11px; color:var(--em3); font-weight:700; margin-bottom:12px; }
 </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <meta name="keywords" content="SDA Zambia, Seventh Day Adventist Zambia, Church Portal Zambia, SDA Devotionals, SDA Live Stream, Zambia Churches">
+  <meta property="og:title" content="SDA Church Portal Zambia">
+  <meta property="og:description" content="A digital portal for Seventh-day Adventist members in Zambia with devotionals, church announcements, and live worship services.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://9-blip.github.io">
+  <meta property="og:image" content="https://9-blip.github.io/icon-192.png">
+  <meta name="theme-color" content="#1a1a2e">
+  <meta name="author" content="SDA Portal Zambia">
 </head>
 <body>
 <div id="fb-status" class="fb-status loading">⟳ Connecting…</div>
@@ -3759,24 +3766,27 @@ function submitSubscription() {
     role: 'pending_admin',
     subTxn: txn, subPhone: phone,
     subSubmittedAt: Date.now(),
-    subAmount: 100
+    subAmount: 500
   };
   allA.push(req);
   LS.set('sda-admins', allA);
   admins = allA;
-  // Also save to Firestore so superadmin sees it across all devices
-  if(window.FB){
-    const {addDoc, collection, serverTimestamp, db} = window.FB;
-    const fbReq = Object.assign({}, req, {ts: serverTimestamp()});
-    delete fbReq.p; // never store password in Firebase
-    addDoc(collection(db,'subscription_requests'), fbReq)
-      .catch(function(err){
-        // Retry once after 3 seconds
-        setTimeout(function(){
-          addDoc(collection(db,'subscription_requests'), fbReq).catch(function(){});
-        }, 3000);
-      });
+  // Save to Firestore so superadmin sees it across ALL devices
+  function _saveSubToFirebase() {
+    if (!window.FB) return;
+    const {addDoc, collection, db} = window.FB;
+    const fbReq = Object.assign({}, req);
+    delete fbReq.p; // never store password
+    fbReq.ts = Date.now(); // use timestamp number, not sentinel (sentinel breaks retries)
+    return addDoc(collection(db, 'subscription_requests'), fbReq);
   }
+  _saveSubToFirebase()
+    .catch(function() {
+      // Retry after 4 seconds with a fresh call
+      setTimeout(function() {
+        _saveSubToFirebase() && _saveSubToFirebase().catch(function(){});
+      }, 4000);
+    });
   // Clear form
   ['sub-name','sub-user','sub-pw','sub-pw2','sub-txn','sub-phone'].forEach(id=>{
     const el=document.getElementById(id); if(el)el.value='';
