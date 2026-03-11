@@ -54,42 +54,247 @@
   window.nav._isStub=true;
 })();
 </script>
-<!-- Firebase v10 modular SDK (loaded async, non-blocking) -->
+<!-- Google Sheets backend (via Google Apps Script web app) -->
 <script>
 // ═══════════════════════════════════════════════════════════════
-// SDA PORTAL — Google Sheets backend (replaces Firebase)
-// Paste your Apps Script Web App URL below
+// GOOGLE SHEETS CONFIGURATION
+// ---------------------------------------------------------------
+// SETUP INSTRUCTIONS:
+//
+//  STEP 1 — Create your Google Sheet:
+//    • Go to https://sheets.google.com and create a new spreadsheet
+//    • Name it "SDA Portal Zambia"
+//    • It can stay empty — the Apps Script will create sheet tabs automatically
+//
+//  STEP 2 — Create the Apps Script web app:
+//    • In your Google Sheet: Extensions → Apps Script
+//    • Delete any existing code, then paste ALL of the following:
+//
+// ─── PASTE THIS INTO APPS SCRIPT ────────────────────────────────
+// function doGet(e)  { return _handle(e); }
+// function doPost(e) { return _handle(e); }
+// function _handle(e) {
+//   var p = e.parameter || {};
+//   var action = p.action || '';
+//   var sheetName = p.sheet || 'data';
+//   var ss = SpreadsheetApp.getActiveSpreadsheet();
+//   var sheet = ss.getSheetByName(sheetName);
+//   if (!sheet) { sheet = ss.insertSheet(sheetName); sheet.appendRow(['id','data','ts']); }
+//   var out;
+//   try {
+//     if (action === 'getDocs') {
+//       var rows = sheet.getDataRange().getValues();
+//       if (rows.length < 2) { out = { ok:true, docs:[] }; }
+//       else {
+//         var filters = p.filters ? JSON.parse(p.filters) : {};
+//         var docs = [];
+//         for (var i = 1; i < rows.length; i++) {
+//           var id = rows[i][0]; var raw = rows[i][1]; var ts = rows[i][2];
+//           if (!id) continue;
+//           var data = {}; try { data = JSON.parse(raw || '{}'); } catch(er) {}
+//           var match = true;
+//           for (var k in filters) { if (data[k] != filters[k]) { match = false; break; } }
+//           if (match) docs.push({ id: id, data: data, ts: ts });
+//         }
+//         out = { ok:true, docs:docs };
+//       }
+//     } else if (action === 'getDoc') {
+//       var rows2 = sheet.getDataRange().getValues();
+//       var found = null;
+//       for (var j = 1; j < rows2.length; j++) {
+//         if (String(rows2[j][0]) === String(p.id)) {
+//           try { found = JSON.parse(rows2[j][1] || '{}'); } catch(e2) { found = {}; }
+//           break;
+//         }
+//       }
+//       out = found ? { ok:true, exists:true, id:p.id, data:found } : { ok:true, exists:false };
+//     } else if (action === 'addDoc') {
+//       var body = JSON.parse(e.postData ? e.postData.contents : '{}');
+//       var newId = body.id || Utilities.getUuid();
+//       body.id = newId;
+//       var ts2 = new Date().toISOString();
+//       sheet.appendRow([newId, JSON.stringify(body), ts2]);
+//       out = { ok:true, id:newId };
+//     } else if (action === 'updateDoc') {
+//       var upd = JSON.parse(e.postData ? e.postData.contents : '{}');
+//       var rows3 = sheet.getDataRange().getValues();
+//       for (var k2 = 1; k2 < rows3.length; k2++) {
+//         if (String(rows3[k2][0]) === String(p.id)) {
+//           var existing = {}; try { existing = JSON.parse(rows3[k2][1] || '{}'); } catch(e3) {}
+//           Object.assign(existing, upd);
+//           sheet.getRange(k2 + 1, 2).setValue(JSON.stringify(existing));
+//           break;
+//         }
+//       }
+//       out = { ok:true };
+//     } else if (action === 'deleteDoc') {
+//       var rows4 = sheet.getDataRange().getValues();
+//       for (var m = 1; m < rows4.length; m++) {
+//         if (String(rows4[m][0]) === String(p.id)) { sheet.deleteRow(m + 1); break; }
+//       }
+//       out = { ok:true };
+//     } else {
+//       out = { ok:false, error:'Unknown action: ' + action };
+//     }
+//   } catch(ex) { out = { ok:false, error:ex.toString() }; }
+//   return ContentService.createTextOutput(JSON.stringify(out))
+//     .setMimeType(ContentService.MimeType.JSON);
+// }
+// ─── END OF APPS SCRIPT CODE ────────────────────────────────────
+//
+//  STEP 3 — Deploy the web app:
+//    • Click "Deploy" → "New deployment"
+//    • Type: Web app
+//    • Execute as: Me (your Google account)
+//    • Who has access: Anyone
+//    • Click "Deploy" and copy the web app URL
+//
+//  STEP 4 — Paste the URL below:
+//
 // ═══════════════════════════════════════════════════════════════
-const GS_URL = 'https://script.google.com/macros/s/AKfycbyXelrsx8SL-525srPaaSiJSAj1KZ18hXIsut-5YdUJiM9BGxQfhUGm3NR5YwvVi7_yiw/exec';
 
-window.GS = {
-  _req: function(params) {
-    return fetch(GS_URL + '?' + new URLSearchParams(params))
-      .then(function(r){ return r.json(); })
-      .then(function(res){ if(!res.ok) throw new Error(res.error); return res.data; });
-  },
-  _post: function(body) {
-    return fetch(GS_URL, { method:'POST', body: JSON.stringify(body) })
-      .then(function(r){ return r.json(); })
-      .then(function(res){ if(!res.ok) throw new Error(res.error); return res; });
-  },
-  getAll:      function(col)        { return window.GS._req({action:'getAll',   collection:col}); },
-  add:         function(col, data)  { return window.GS._post({action:'add',     collection:col, data:data}); },
-  update:      function(col, id, d) { return window.GS._post({action:'update',  collection:col, id:id,   data:d}); },
-  del:         function(col, id)    { return window.GS._post({action:'delete',  collection:col, id:id}); },
-  delWhere:    function(col, f, v)  { return window.GS._post({action:'deleteWhere', collection:col, field:f, value:v}); },
-  poll:        function(col, cb, secs) {
-    secs = secs || 15;
-    window.GS.getAll(col).then(cb).catch(function(){});
-    return setInterval(function(){ window.GS.getAll(col).then(cb).catch(function(){}); }, secs*1000);
+// ▼▼▼ PASTE YOUR APPS SCRIPT WEB APP URL HERE ▼▼▼
+const GS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzyVl5W9-8uhrNsP9O5ItVmfJGNXNSu8Xd_0luB8iKMvNSrgKtFigC5DfxXgI2c9_Mx/exec';
+// ▲▲▲ REPLACE THE VALUE ABOVE — DO NOT LEAVE AS PLACEHOLDER ▲▲▲
+
+const GS_CONFIGURED = typeof GS_SCRIPT_URL === 'string' && GS_SCRIPT_URL.length > 0 && !GS_SCRIPT_URL.startsWith('YOUR_');
+
+// ── Google Sheets / Apps Script fetch helpers ──────────────────
+function _gsGet(action, sheetName, extraParams) {
+  var params = Object.assign({ action: action, sheet: sheetName }, extraParams || {});
+  var qs = Object.keys(params).map(function(k) {
+    return encodeURIComponent(k) + '=' + encodeURIComponent(params[k]);
+  }).join('&');
+  return fetch(GS_SCRIPT_URL + '?' + qs).then(function(r) { return r.json(); });
+}
+
+function _gsPost(action, sheetName, bodyData, extraParams) {
+  var params = Object.assign({ action: action, sheet: sheetName }, extraParams || {});
+  var qs = Object.keys(params).map(function(k) {
+    return encodeURIComponent(k) + '=' + encodeURIComponent(params[k]);
+  }).join('&');
+  return fetch(GS_SCRIPT_URL + '?' + qs, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(bodyData || {})
+  }).then(function(r) { return r.json(); });
+}
+
+// ── Firestore-compatible API shim ──────────────────────────────
+// All window.FB.addDoc / getDocs / etc. calls work unchanged.
+var _gsDB = { _type: 'gsdb' };
+
+function collection(db, name) {
+  return { _type: 'gscol', _col: name };
+}
+function doc(dbOrCol, colNameOrId, maybeId) {
+  if (dbOrCol && dbOrCol._type === 'gscol') {
+    return { _type: 'gsdoc', _col: dbOrCol._col, _id: colNameOrId };
   }
-};
+  return { _type: 'gsdoc', _col: colNameOrId, _id: maybeId };
+}
+function query(colRef) {
+  var constraints = Array.prototype.slice.call(arguments, 1);
+  return { _type: 'gsquery', _col: colRef._col, _constraints: constraints };
+}
+function where(field, op, val) {
+  return { _type: 'gswhere', field: field, op: op, val: val };
+}
+function orderBy(field, dir) { return { _type: 'gsorderby', field: field, dir: dir }; }
+function limit(n)             { return { _type: 'gslimit', n: n }; }
+function serverTimestamp()    { return new Date().toISOString(); }
+function onSnapshot()         { return function() {}; } // no-op stub
 
-window.FB = null;
-window.FB_CONFIGURED = false;
-window.FB_READY = false;
-window.CLOUDINARY_CLOUD = window.CLOUDINARY_CLOUD || null;
-console.log('SDA Portal: Google Sheets backend ready');
+function _makeSnap(docs) {
+  return {
+    size: docs.length,
+    forEach: function(fn) {
+      docs.forEach(function(d) {
+        fn({ id: d.id, data: function() { return d.data || {}; } });
+      });
+    }
+  };
+}
+
+function addDoc(colRef, data) {
+  var sheetName = colRef._col;
+  return _gsPost('addDoc', sheetName, data).then(function(res) {
+    return { id: (res && res.id) ? res.id : (data.id || ('doc_' + Date.now())) };
+  }).catch(function() {
+    return { id: data.id || ('doc_' + Date.now()) };
+  });
+}
+
+function getDocs(queryOrCol) {
+  var sheetName = queryOrCol._col;
+  var constraints = queryOrCol._constraints || [];
+  var filters = {};
+  constraints.forEach(function(c) {
+    if (c && c._type === 'gswhere' && c.op === '==') {
+      filters[c.field] = c.val;
+    }
+  });
+  var extra = Object.keys(filters).length ? { filters: JSON.stringify(filters) } : {};
+  return _gsGet('getDocs', sheetName, extra).then(function(res) {
+    var docs = (res && res.docs) ? res.docs : [];
+    return _makeSnap(docs);
+  }).catch(function() {
+    return _makeSnap([]);
+  });
+}
+
+function getDoc(docRef) {
+  return _gsGet('getDoc', docRef._col, { id: docRef._id }).then(function(res) {
+    return {
+      exists: function() { return !!(res && res.exists); },
+      id: docRef._id,
+      data: function() {
+        var d = (res && res.data) ? res.data : {};
+        // Add toDate() shim on any ISO date-string fields for backward compatibility
+        Object.keys(d).forEach(function(k) {
+          if (typeof d[k] === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(d[k])) {
+            var iso = d[k];
+            d[k] = { _iso: iso, toDate: function() { return new Date(iso); }, toString: function() { return iso; } };
+          }
+        });
+        return d;
+      }
+    };
+  }).catch(function() {
+    return { exists: function() { return false; }, id: docRef._id, data: function() { return {}; } };
+  });
+}
+
+function updateDoc(docRef, data) {
+  return _gsPost('updateDoc', docRef._col, data, { id: docRef._id }).catch(function() {});
+}
+
+function deleteDoc(docRef) {
+  return _gsPost('deleteDoc', docRef._col, {}, { id: docRef._id }).catch(function() {});
+}
+
+// File storage — Google Sheets does not support binary file uploads.
+// Media uploads automatically fall back to local/IndexedDB mode (already built in).
+function storageRef()          { return null; }
+function uploadBytesResumable(){ return null; }
+function getDownloadURL()      { return Promise.reject('Google Sheets: no file storage'); }
+function deleteObject()        { return Promise.resolve(); }
+
+window.FB = GS_CONFIGURED ? {
+  db: _gsDB,
+  storage: null, // No file storage — media falls back to local mode
+  addDoc: addDoc, getDocs: getDocs, onSnapshot: onSnapshot,
+  collection: collection, query: query, orderBy: orderBy,
+  limit: limit, doc: doc, getDoc: getDoc, updateDoc: updateDoc,
+  serverTimestamp: serverTimestamp, where: where, deleteDoc: deleteDoc,
+  storageRef: storageRef, uploadBytesResumable: uploadBytesResumable,
+  getDownloadURL: getDownloadURL, deleteObject: deleteObject
+} : null;
+
+window.FB_CONFIGURED = GS_CONFIGURED;
+window.FB_READY = GS_CONFIGURED;
+if (GS_CONFIGURED) window.dispatchEvent(new Event('fb-ready'));
+else console.info('Google Sheets not configured — running in local mode (localStorage).');
 </script>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 <noscript><link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet"></noscript>
@@ -3161,14 +3366,18 @@ function injectApprovedChurches() {
     }
   });
   // Also inject from Firebase
-  window.GS.getAll('church_registrations').then(function(rows) {
-    rows.forEach(function(reg) {
-      if (reg.status === 'approved') {
-        const dist = DISTRICTS.find(d2 => d2.id === reg.distId);
-        if (dist && dist.churches && !dist.churches.includes(reg.name)) {
-          dist.churches.push(reg.name);
-        }
-      }
+  if (window.FB) {
+    const { getDocs, collection, db } = window.FB;
+    getDocs(collection(db, 'church_registrations'))
+      .then(function(snap) {
+        snap.forEach(function(d) {
+          const reg = d.data();
+          if (reg.status === 'approved') {
+            const dist = DISTRICTS.find(d2 => d2.id === reg.distId);
+            if (dist && dist.churches && !dist.churches.includes(reg.name)) {
+              dist.churches.push(reg.name);
+            }
+          }
         });
       }).catch(function(){});
   }
@@ -3492,14 +3701,23 @@ function swTab(t){
   });
 }
 // ═══ SUBSCRIPTION GUARD ═══
-// Checks Firestore "admins/{userId}" for a valid subscriptionExpires field.
+// Checks Google Sheets "admins" sheet for a valid subscriptionExpires field.
 // Falls back gracefully if Firebase is not configured (local-only mode).
 async function enforceAdminAccess(userId) {
+  if (!window.FB) return true; // Firebase not configured — allow local mode
+  const { doc: fbDoc, getDoc, updateDoc, db } = window.FB;
   try {
-    const rows = await window.GS.getAll('admins');
-    const record = rows.find(function(r){ return r.u === userId || r.id === userId; });
-    if (!record) return true;
-    if (!record.subscriptionExpires) return true;
+    const adminRef = fbDoc(db, "admins", userId);
+    const adminSnap = await getDoc(adminRef);
+    if (!adminSnap.exists()) {
+      // No Firestore record for this user — allow (local accounts not in Firestore)
+      return true;
+    }
+    const data = adminSnap.data();
+    if (!data.subscriptionExpires) {
+      // Record exists but has no expiry field — allow access
+      return true;
+    }
     const now = new Date();
     const expiry = data.subscriptionExpires.toDate();
     if (now > expiry) {
@@ -3607,46 +3825,36 @@ function pruneExpiredAdmins(){
 }
 function doLogin(){
   setErr('login-err','');
+  pruneExpiredAdmins();
+  admins=LS.get('sda-admins',[]);
   const u=(document.getElementById('au').value||'').trim();
   const p=document.getElementById('ap').value||'';
   if(!u||!p){setErr('login-err','Please enter both username and password.');return}
-  setErr('login-err','⏳ Checking...');
-
-  function _loginWith(found){
-    if(!found){setErr('login-err','Incorrect username or password.');return;}
-    if(!found.churchId&&found.church) found.churchId=makeChurchId(found.church);
-    if(adminExpired(found)){setErr('login-err','Account expired. Please subscribe again.');return;}
-    if(found.role==='pending_admin'){setErr('login-err','⏳ Your request is pending superadmin approval.');return;}
-    // Cache locally for offline fallback
-    const allA=LS.get('sda-admins',[]);
-    const ex=allA.findIndex(a=>a.u===found.u);
-    if(ex>=0) allA[ex]=found; else allA.push(found);
-    LS.set('sda-admins',allA); admins=allA;
-    setErr('login-err','');
-    const dl=adminDaysLeft(found);
-    openDash(found);
-    toast('Welcome back, '+found.n+' 👋'+(dl!==null?' · '+dl+' day'+(dl!==1?'s':'')+' remaining':''),4500);
-    addLog('Login: '+found.n+(dl!==null?' ('+dl+'d left)':''));
+  let found=admins.find(a=>a.u===u&&a.p===p);
+  if(!found){
+    setErr('login-err','Incorrect username or password.');
+    return;
   }
-
-  // Check Google Sheets admins first (works cross-device)
-  window.GS.getAll('admins')
-    .then(function(rows){
-      var found=rows.find(function(a){return a.u===u&&a.p===p;});
-      if(found){ _loginWith(found); }
-      else {
-        // Fallback: localStorage cache
-        pruneExpiredAdmins();
-        admins=LS.get('sda-admins',[]);
-        _loginWith(admins.find(function(a){return a.u===u&&a.p===p;})||null);
-      }
-    })
-    .catch(function(){
-      // GS unavailable — use localStorage only
-      pruneExpiredAdmins();
-      admins=LS.get('sda-admins',[]);
-      _loginWith(admins.find(function(a){return a.u===u&&a.p===p;})||null);
-    });
+  // Ensure churchId is always set — fix missing churchId from old registrations
+  if(!found.churchId && found.church){
+    found.churchId = makeChurchId(found.church);
+    // Persist the fix
+    const allA=LS.get('sda-admins',[]);
+    const idx=allA.findIndex(a=>a.u===found.u);
+    if(idx>=0){allA[idx].churchId=found.churchId; LS.set('sda-admins',allA);}
+  }
+  if(adminExpired(found)){
+    setErr('login-err','This admin account expired. Please subscribe again to renew.');
+    return;
+  }
+  if(found.role==='pending_admin'){
+    setErr('login-err','⏳ Your subscription request is pending approval by THABO1. Please check back soon.');
+    return;
+  }
+  const dl=adminDaysLeft(found);
+  openDash(found);
+  toast('Welcome back, '+found.n+' 👋'+(dl!==null?' · '+dl+' day'+(dl!==1?'s':'')+' remaining':''),4500);
+  addLog('Login: '+found.n+(dl!==null?' ('+dl+'d left)':''));
 }
 function doRegister(){
   setErr('reg-err','');
@@ -3734,18 +3942,33 @@ function submitSubscription() {
   delete _fbReq.p;
   _fbReq.ts = Date.now();
 
-  // Save to Google Sheets — visible to superadmin on any device
-  if(_submitBtn){ _submitBtn.disabled=true; _submitBtn.textContent='⏳ Sending...'; }
-  window.GS.add('subscription_requests', _fbReq)
-    .then(function() {
-      toast('✅ Request submitted! Superadmin will review shortly.', 4500);
-      if(_submitBtn){ _submitBtn.disabled=false; _submitBtn.textContent='Submit Request'; }
-      _afterSave();
-    })
-    .catch(function(err) {
-      if(_submitBtn){ _submitBtn.disabled=false; _submitBtn.textContent='Submit Request'; }
-      toast('⚠️ Failed: ' + (err.message||String(err)) + '. Check internet and retry.', 7000);
-    });
+  function _saveSubToFirebase(attempt) {
+    attempt = attempt || 1;
+    if (!window.FB) {
+      // FB not ready yet — wait and retry up to 5 times
+      if (attempt <= 5) {
+        setTimeout(function() { _saveSubToFirebase(attempt + 1); }, 2000 * attempt);
+      }
+      return;
+    }
+    var addDoc = window.FB.addDoc;
+    var collection = window.FB.collection;
+    var db = window.FB.db;
+    addDoc(collection(db, 'subscription_requests'), _fbReq)
+      .then(function(docRef) {
+        console.log('SDA: sub saved to Firebase', docRef.id);
+        if (attempt === 1) toast('☁️ Request sent to superadmin!', 3000);
+      })
+      .catch(function(err) {
+        console.warn('SDA: Firebase sub save failed (attempt ' + attempt + '):', err);
+        if (attempt <= 3) {
+          setTimeout(function() { _saveSubToFirebase(attempt + 1); }, 3000 * attempt);
+        } else {
+          toast('⚠️ Cloud sync failed: ' + (err.message || err) + '. Please resubmit.', 6000);
+        }
+      });
+  }
+  _saveSubToFirebase(1);
   // Clear form
   ['sub-name','sub-user','sub-pw','sub-pw2','sub-txn','sub-phone'].forEach(id=>{
     const el=document.getElementById(id); if(el)el.value='';
@@ -3831,12 +4054,31 @@ function renderSubRequests() {
   const el=document.getElementById('subs-list'); if(!el)return;
   // Show loading state
   el.innerHTML='<div style="text-align:center;padding:20px;color:var(--text3);font-size:13px">⏳ Loading requests...</div>';
-  // Poll Google Sheets every 15s — shows on all devices instantly
-  if(window._subPollInterval) clearInterval(window._subPollInterval);
-  window._subPollInterval = window.GS.poll('subscription_requests', function(rows) {
-    var pending = rows.filter(function(r){ return r.role === 'pending_admin'; });
-    _renderSubList(pending);
-  }, 15);
+  // Pull from Firestore first (cross-device)
+  if(window.FB){
+    // No where() clause — get all docs and filter client-side
+    // where() requires a Firestore index which causes silent failures
+    const {getDocs, collection, db} = window.FB;
+    getDocs(collection(db,'subscription_requests'))
+      .then(snap=>{
+        const fbPending=[];
+        snap.forEach(d=>{ const data=d.data(); data._fbId=d.id; if(data.role==='pending_admin') fbPending.push(data); });
+        // Merge with any local-only entries not yet in Firestore
+        const local=LS.get('sda-admins',[]).filter(a=>a.role==='pending_admin');
+        const allUsers=new Set(fbPending.map(a=>a.u));
+        local.forEach(a=>{ if(!allUsers.has(a.u)) fbPending.push(a); });
+        _renderSubList(fbPending);
+      })
+      .catch(function(err){
+        console.warn('SDA: renderSubRequests Firebase failed:', err);
+        const local=LS.get('sda-admins',[]).filter(a=>a.role==='pending_admin');
+        _renderSubList(local);
+      });
+  } else {
+    // No Firebase — use localStorage only
+    const local=LS.get('sda-admins',[]).filter(a=>a.role==='pending_admin');
+    _renderSubList(local);
+  }
 }
 
 function approveSubRequest(username, fbId) {
@@ -3855,16 +4097,17 @@ function approveSubRequest(username, fbId) {
     LS.set('sda-admins',all);
     admins=all;
   }
-  // Move approved admin to admins sheet, remove from subscription_requests
-  window.GS.getAll('subscription_requests').then(function(rows){
-    var rec = rows.find(function(r){ return r.id===fbId || r.u===username; });
-    if(rec){
-      rec.role='admin'; rec.approvedBy='SEVENTHDAYADVENTIST';
-      rec.approvedAt=Date.now(); rec.registeredAt=Date.now();
-      window.GS.add('admins', rec).catch(function(){});
-      window.GS.del('subscription_requests', rec.id).catch(function(){});
-    }
-  }).catch(function(){});
+  // Delete from Firestore subscription_requests and write to admins collection
+  if(window.FB && fbId){
+    const {deleteDoc, doc, addDoc, collection, serverTimestamp, db} = window.FB;
+    deleteDoc(doc(db,'subscription_requests',fbId)).catch(()=>{});
+  } else if(window.FB){
+    // Try to find by username in Firestore
+    const {getDocs, collection, query, where, deleteDoc, doc, db} = window.FB;
+    getDocs(query(collection(db,'subscription_requests'), where('u','==',username)))
+      .then(snap=>{ snap.forEach(d=>deleteDoc(doc(db,'subscription_requests',d.id)).catch(()=>{})); })
+      .catch(()=>{});
+  }
   const nm = idx>=0 ? all[idx].n : username;
   toast('✅ '+nm+' approved! Admin access granted for 60 days.',4500);
   addLog('Approved sub: '+nm+' (@'+username+')');
@@ -3887,9 +4130,16 @@ function rejectSubRequest(username, fbId) {
   const filtered=all.filter(a=>!(a.u===username&&a.role==='pending_admin'));
   LS.set('sda-admins',filtered);
   admins=filtered;
-  // Delete from Google Sheets
-  if(fbId){ window.GS.del('subscription_requests', fbId).catch(function(){}); }
-  else { window.GS.delWhere('subscription_requests','u',username).catch(function(){}); }
+  // Also delete from Firestore
+  if(window.FB && fbId){
+    const {deleteDoc, doc, db} = window.FB;
+    deleteDoc(doc(db,'subscription_requests',fbId)).catch(()=>{});
+  } else if(window.FB){
+    const {getDocs, collection, query, where, deleteDoc, doc, db} = window.FB;
+    getDocs(query(collection(db,'subscription_requests'), where('u','==',username)))
+      .then(snap=>{ snap.forEach(d=>deleteDoc(doc(db,'subscription_requests',d.id)).catch(()=>{})); })
+      .catch(()=>{});
+  }
   toast('❌ Rejected and removed: @'+username,3500);
   addLog('Rejected sub: @'+username);
   var card = document.querySelector('#subs-list [data-u="'+username+'"]');
@@ -4007,10 +4257,14 @@ function renderActsList(){
   const lblEl=document.getElementById('acts-church-lbl');
   if(!listEl)return;
 
-  if (!renderActsList._syncing) {
+  if (window.FB && !renderActsList._syncing) {
     renderActsList._syncing = true;
-    window.GS.getAll('activities')
-      .then(function(fbActs) {
+    const { getDocs, collection, db } = window.FB;
+    const timeout = new Promise((_, rej) => setTimeout(() => rej('timeout'), 8000));
+    Promise.race([getDocs(collection(db, 'activities')), timeout])
+      .then(snap => {
+        const fbActs = [];
+        snap.forEach(d => { const data = d.data(); data._fbId = d.id; fbActs.push(data); });
         const local = LS.get('x-acts', []);
         const fbIds = new Set(fbActs.map(a => a.id));
         local.forEach(a => { if (!fbIds.has(a.id)) fbActs.push(a); });
@@ -4182,7 +4436,11 @@ function addAct(){
     expiresAt:Date.now()+WEEK_MS,  // auto-delete after 7 days
   });
   LS.set('x-acts',extra);
-  window.GS.add('activities', extra[extra.length-1]).catch(function(){});
+  if (window.FB) {
+    const { addDoc, collection, serverTimestamp, db } = window.FB;
+    const act = extra[extra.length - 1];
+    addDoc(collection(db, 'activities'), Object.assign({}, act, { ts: serverTimestamp() })).catch(() => {});
+  }
   ['aan','aad','aadate','aatime','aarec','aai'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.getElementById('act-prev').innerHTML='';actPhotoURL=null;
   toast('\u2705 Posted to '+scopeLabel);
@@ -4447,10 +4705,14 @@ window.doLogin=function(){
   }
 };
 function renderMiss(){
-  if (!renderMiss._syncing) {
+  if (window.FB && !renderMiss._syncing) {
     renderMiss._syncing = true;
-    window.GS.getAll('missions')
-      .then(function(fbMiss) {
+    const { getDocs, collection, db } = window.FB;
+    const timeout = new Promise((_, rej) => setTimeout(() => rej('timeout'), 8000));
+    Promise.race([getDocs(collection(db, 'missions')), timeout])
+      .then(snap => {
+        const fbMiss = [];
+        snap.forEach(d => { const data = d.data(); data._fbId = d.id; fbMiss.push(data); });
         const local = LS.get('x-miss', []);
         const fbIds = new Set(fbMiss.map(m => m.id));
         local.forEach(m => { if (!fbIds.has(m.id)) fbMiss.push(m); });
@@ -4484,7 +4746,10 @@ function addMiss(){
   const miss={id:'m'+Date.now(),icon:i,title:n,desc:d,region:r,postedAtMs:Date.now(),postedAt:new Date().toLocaleString()};
   extra.push(miss);
   LS.set('x-miss',extra);
-  window.GS.add('missions', miss).catch(function(){});
+  if (window.FB) {
+    const { addDoc, collection, serverTimestamp, db } = window.FB;
+    addDoc(collection(db, 'missions'), Object.assign({}, miss, { ts: serverTimestamp() })).catch(() => {});
+  }
   ['amn','amr','ami','amd'].forEach(id=>document.getElementById(id).value='');
   toast('Mission report added! ✅');addLog('Mission: '+n);updStats();
   renderMiss();
@@ -5439,7 +5704,7 @@ async function loadPersistedMedia(){
 /* ===== FILE UPLOADS ===== */
 function fmtSize(bytes){return bytes>1048576?(bytes/1048576).toFixed(1)+' MB':(bytes/1024).toFixed(0)+' KB'}
 /* ═════════════════════════════════════════════════════════════════
-   MEDIA UPLOAD — Firebase Storage (if configured) + IDB fallback
+   MEDIA UPLOAD — Google Sheets sync (if configured) + IDB/local fallback
    ═════════════════════════════════════════════════════════════════ */
 function _mediaShowProgress(pfx,pct,label){
   var w=document.getElementById(pfx+'-progress-wrap');
@@ -5467,14 +5732,19 @@ function _setUploadBtnState(id,loading){
 }
 function refreshMediaStorageBadge(){
   var el=document.getElementById('media-storage-badge');if(!el)return;
-  // Show Firebase connection status
+  // Show Google Sheets connection status
   if(window.CLOUDINARY_CLOUD){
     el.style.cssText='font-size:11px;color:var(--em3);background:rgba(26,122,80,.08);border:1px solid rgba(26,122,80,.2);border-radius:8px;padding:8px 12px;margin-bottom:12px;line-height:1.6';
     el.innerHTML='☁️ <strong>Cloudinary</strong> — media saved to cloud. Works on any device.';
     return;
   }
-  el.style.cssText='display:block;background:rgba(218,168,64,.09);border:1px solid rgba(218,168,64,.3);border-radius:10px;padding:9px 13px;font-size:11.5px;margin-bottom:12px;line-height:1.55';
-  el.textContent='\ud83d\udcbe Media saved via Cloudinary. Subscriptions and admins synced via Google Sheets.';
+  if(window.FB_CONFIGURED&&window.FB&&window.FB.storage){
+    el.style.cssText='display:block;background:rgba(26,106,66,.12);border:1px solid rgba(26,106,66,.35);border-radius:10px;padding:9px 13px;font-size:11.5px;margin-bottom:12px';
+    el.textContent='\u2601\ufe0f Cloud sync active \u2014 uploads saved to Google Sheets and shared across devices.';
+  }else{
+    el.style.cssText='display:block;background:rgba(218,168,64,.09);border:1px solid rgba(218,168,64,.3);border-radius:10px;padding:9px 13px;font-size:11.5px;margin-bottom:12px;line-height:1.55';
+    el.textContent='\ud83d\udcbe Local mode \u2014 media saved on this device only. Set GS_SCRIPT_URL in the page header to enable Google Sheets sync.';
+  }
 }
 function _buildMediaRecord(extra){
   var ch=currentAdmin&&currentAdmin.church||'';
@@ -5550,8 +5820,11 @@ function addPhotoFromURL(){
   var saved=JSON.parse(localStorage.getItem('sda-media-cloud')||'[]');
   saved.push(item);
   try{localStorage.setItem('sda-media-cloud',JSON.stringify(saved));}catch(e){}
-  // Save to Google Sheets media sheet
-  window.GS.add('media', Object.assign({}, item)).catch(function(){});
+  // Save to Firestore
+  if(window.FB&&window.FB.db){
+    window.FB.addDoc(window.FB.collection(window.FB.db,'media'),
+      Object.assign({},item,{ts:window.FB.serverTimestamp()})).catch(function(){});
+  }
   // Add to gallery immediately
   var gal=document.getElementById('pgal');
   if(gal&&!gal.querySelector('[data-url="'+url+'"]')){
@@ -5727,7 +6000,8 @@ function handlePhotos(inp){
         var saved=JSON.parse(localStorage.getItem('sda-media-cloud')||'[]');
         saved.push(Object.assign({},item,{url:dlURL,downloadURL:dlURL,source:'supabase'}));
         try{localStorage.setItem('sda-media-cloud',JSON.stringify(saved));}catch(e){}
-        window.GS.add('media', Object.assign({},rec,{downloadURL:dlURL,storagePath:sp})).catch(function(){});
+        if(window.FB&&window.FB.db){window.FB.addDoc(window.FB.collection(window.FB.db,'media'),
+          Object.assign({},rec,{downloadURL:dlURL,storagePath:sp,ts:window.FB.serverTimestamp()})).catch(function(){});}
         toast('✅ Photo uploaded!',2000);
       })
       .catch(function(err){
@@ -5793,7 +6067,7 @@ function handleAudio(inp){
     mediaItems.push({type:'audio',url:url,title:title,preacher:preacher,size:f.size,church:rec.church,churchId:rec.churchId,dist:rec.dist,postedBy:rec.postedBy,postedAt:rec.postedAt,postedAtMs:rec.postedAtMs,expiresAt:rec.expiresAt,uploadedDate:rec.uploadedDate,source:source,_delKey:_cka});
     ['at','apr','a-date'].forEach(function(id){var x=document.getElementById(id);if(x)x.value='';});
     _mediaHideProgress('audio'); _setUploadBtnState('audio-btn',false);
-    _mediaMsg('audio','ok','"'+title+'" uploaded \u2014 '+(source==='firebase'?'saved to cloud':'saved on device'));
+    _mediaMsg('audio','ok','"'+title+'" uploaded \u2014 '+(source==='cloud'?'saved to cloud':'saved on device'));
     renderAdminMediaPanels(); updStats(); addLog('Audio: '+title);
   }
   function onFail(err){
@@ -5804,7 +6078,7 @@ function handleAudio(inp){
   _uploadToStorage(f,sp,function(pct){_mediaShowProgress('audio',pct,'"'+title+'" \u2014 '+pct+'%');})
   .then(function(dlURL){
       var _cka='ck_'+Date.now()+'_'+Math.random().toString(36).slice(2);
-      window.GS.add('media', Object.assign({},rec,{downloadURL:dlURL,storagePath:sp})).catch(function(){});
+      if(window.FB){window.FB.addDoc(window.FB.collection(window.FB.db,'media'),Object.assign({},rec,{downloadURL:dlURL,storagePath:sp,ts:window.FB.serverTimestamp()})).catch(function(){});}
       // Save to localStorage so audio survives reload
     var savedA=JSON.parse(localStorage.getItem('sda-media-cloud')||'[]');
     savedA.push({type:'audio',url:dlURL,title:title,preacher:preacher,size:f.size,church:rec.church,churchId:rec.churchId,dist:rec.dist,postedBy:rec.postedBy,postedAt:rec.postedAt,postedAtMs:rec.postedAtMs,expiresAt:rec.expiresAt,uploadedDate:rec.uploadedDate,source:'cloudinary',_delKey:_cka});
@@ -5839,7 +6113,7 @@ function handleVideo(inp){
     mediaItems.push({type:'video',url:url,title:title,preacher:preacher,size:f.size,church:rec.church,churchId:rec.churchId,dist:rec.dist,postedBy:rec.postedBy,postedAt:rec.postedAt,postedAtMs:rec.postedAtMs,expiresAt:rec.expiresAt,uploadedDate:rec.uploadedDate,source:source,_delKey:_ckv});
     ['vt','vpr','v-date'].forEach(function(id){var x=document.getElementById(id);if(x)x.value='';});
     _mediaHideProgress('video'); _setUploadBtnState('video-btn',false);
-    _mediaMsg('video','ok','"'+title+'" uploaded \u2014 '+(source==='firebase'?'saved to cloud':'saved on device'));
+    _mediaMsg('video','ok','"'+title+'" uploaded \u2014 '+(source==='cloud'?'saved to cloud':'saved on device'));
     renderAdminMediaPanels(); updStats(); addLog('Video: '+title);
   }
   function onFail(err){
@@ -5850,7 +6124,7 @@ function handleVideo(inp){
   _uploadToStorage(f,sp,function(pct){_mediaShowProgress('video',pct,'"'+title+'" \u2014 '+pct+'%');})
   .then(function(dlURL){
       var _ckv='ck_'+Date.now()+'_'+Math.random().toString(36).slice(2);
-      window.GS.add('media', Object.assign({},rec,{downloadURL:dlURL,storagePath:sp})).catch(function(){});
+      if(window.FB){window.FB.addDoc(window.FB.collection(window.FB.db,'media'),Object.assign({},rec,{downloadURL:dlURL,storagePath:sp,ts:window.FB.serverTimestamp()})).catch(function(){});}
       var savedV=JSON.parse(localStorage.getItem('sda-media-cloud')||'[]');
       savedV.push({type:'video',url:dlURL,title:title,preacher:preacher,size:f.size,church:rec.church,churchId:rec.churchId,dist:rec.dist,postedBy:rec.postedBy,postedAt:rec.postedAt,postedAtMs:rec.postedAtMs,expiresAt:rec.expiresAt,uploadedDate:rec.uploadedDate,source:'cloudinary',_delKey:_ckv});
       try{localStorage.setItem('sda-media-cloud',JSON.stringify(savedV));}catch(e){}
@@ -6234,10 +6508,17 @@ function loadSubRequests() {
   var el = document.getElementById('subs-list');
   if (!el) return;
   el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text3);font-size:13px">\u23F3 Loading...</div>';
-  window.GS.getAll('subscription_requests').then(function(rows) {
-    var pending = rows.filter(function(r){ return r.role==='pending_admin'; });
-    _renderSubList(pending);
-  })
+  if (!window.FB) { el.innerHTML = '<div class="empty"><strong>Google Sheets not connected</strong><p style="font-size:11px;color:var(--text3);margin-top:4px">Configure GS_SCRIPT_URL in the page header to enable cloud sync.</p></div>'; return; }
+  const { getDocs, collection, db } = window.FB;
+  getDocs(collection(db, 'subscription_requests'))
+    .then(function(snap) {
+      var pending = [];
+      snap.forEach(function(d) {
+        var data = d.data(); data._fbId = d.id;
+        if (data.role === 'pending_admin') pending.push(data);
+      });
+      _renderSubList(pending);
+    })
     .catch(function(err) {
       el.innerHTML = '<div class="empty"><strong>Error: ' + err + '</strong></div>';
     });
@@ -6789,7 +7070,7 @@ function renderMemberSubmittedActs() {
 /* ═══════════════════════════════════════════════════════════════
    PRAYER & REQUEST GATING  (members only)
    ═══════════════════════════════════════════════════════════════ */
-// ═══ FIREBASE FIRESTORE — Shared prayer requests ═══
+// ═══ GOOGLE SHEETS — Shared prayer requests ═══
 function submitPrayer() {
   const req  = (document.getElementById('p-req')?.value  || '').trim();
   if (!req) { toast('Please enter a prayer request.'); return; }
@@ -6807,7 +7088,10 @@ function submitPrayer() {
   document.getElementById('p-req').value  = '';
   toast('🙏 Prayer submitted!');
   renderPrayerList(arr, document.getElementById('pl'));
-  window.GS.add('prayers', env).catch(function(){});
+  if (window.FB) {
+    const {addDoc, collection, serverTimestamp, db} = window.FB;
+    addDoc(collection(db,'prayers'), Object.assign({}, env, {ts: serverTimestamp()})).catch(()=>{});
+  }
 }
 
 function loadFirestorePrayers(churchId) {
@@ -6818,16 +7102,24 @@ function loadFirestorePrayers(churchId) {
   // Show local cache instantly
   const local = LS.get(localKey, []).filter(p => !p.expiresAt || p.expiresAt > now);
   renderPrayerList(local, pl);
-  // Fetch from Google Sheets for cross-device sync
-  window.GS.getAll('prayers').then(function(rows){
-    const gsRows = rows.filter(function(p){ return p.churchId===churchId; });
-    const localNow = LS.get(localKey, []);
-    const gsIds = new Set(gsRows.map(function(r){ return r.id; }));
-    localNow.forEach(function(r){ if(!gsIds.has(r.id)) gsRows.push(r); });
-    const live = gsRows.filter(function(p){ return !p.expiresAt||p.expiresAt>Date.now(); });
-    LS.set(localKey, live);
-    renderPrayerList(live, pl);
-  }).catch(function(){});
+  // Fetch from Firebase for cross-device sync
+  if (window.FB) {
+    const { getDocs, collection, query, where, db } = window.FB;
+    const timeout = new Promise((_, rej) => setTimeout(() => rej('timeout'), 8000));
+    Promise.race([
+      getDocs(query(collection(db, 'prayers'), where('churchId', '==', churchId))),
+      timeout
+    ]).then(snap => {
+      const regs = [];
+      snap.forEach(d => { const data = d.data(); data._fbId = d.id; regs.push(data); });
+      const localNow = LS.get(localKey, []);
+      const fbIds = new Set(regs.map(r => r.id));
+      localNow.forEach(r => { if (!fbIds.has(r.id)) regs.push(r); });
+      const live = regs.filter(p => !p.expiresAt || p.expiresAt > Date.now());
+      LS.set(localKey, live);
+      renderPrayerList(live, pl);
+    }).catch(() => {});
+  }
 }
 
 function renderPrayerList(prayers, el) {
@@ -6841,7 +7133,7 @@ function renderPrayerList(prayers, el) {
     </div>`).join('');
 }
 
-// ═══ FIREBASE FIRESTORE — Shared announcements & requests ═══
+// ═══ GOOGLE SHEETS — Shared announcements & requests ═══
 function submitReq() {
   const msg  = (document.getElementById('r-msg')?.value  || '').trim();
   if (!msg) { toast('Please enter a message.'); return; }
@@ -6859,7 +7151,10 @@ function submitReq() {
   document.getElementById('r-msg').value  = '';
   toast('📝 Request submitted!');
   renderReqList(arr, document.getElementById('rl'));
-  window.GS.add('requests', env).catch(function(){});
+  if (window.FB) {
+    const {addDoc, collection, serverTimestamp, db} = window.FB;
+    addDoc(collection(db,'requests'), Object.assign({}, env, {ts: serverTimestamp()})).catch(()=>{});
+  }
 }
 function renderReqList(items, el) {
   if (!el) return;
@@ -7051,10 +7346,13 @@ function openDash(a) {
   /* Show Subscriptions tab only for superadmin */
   const subsTab = document.getElementById('subs-tab');
   if (subsTab) subsTab.style.display = (a && typeof window.isSuperAdmin === 'function' && window.isSuperAdmin(a)) ? 'inline-flex' : 'none';
-  // Update subscription badge from Google Sheets
-  window.GS.getAll('subscription_requests')
-    .then(function(rows){ renderSubBadge(rows.filter(function(r){ return r.role==='pending_admin'; }).length); })
-    .catch(function(){ if(typeof renderSubBadge==='function') renderSubBadge(); });
+  // Update subscription badge — check Firestore for accurate cross-device count
+  if(window.FB){
+    const {getDocs, collection, query, where, db} = window.FB;
+    getDocs(query(collection(db,'subscription_requests'), where('role','==','pending_admin')))
+      .then(snap=>{ renderSubBadge(snap.size); })
+      .catch(()=>{ renderSubBadge(); });
+  } else { renderSubBadge?.(); }
   renderMemberApprovalBadge();
 }
 
@@ -7181,13 +7479,20 @@ function nav(p) {
     // Show local cache instantly
     const arr = LS.get(key, []).filter(r => !r.expiresAt || r.expiresAt > now);
     if (typeof renderReqList === 'function') renderReqList(arr, document.getElementById('rl'));
-    // Fetch from Google Sheets for cross-device sync
-    window.GS.getAll('requests').then(function(rows) {
-      const regs = rows.filter(function(r){ return r.churchId===churchId; });
-      const localNow = LS.get(key, []);
-      const fbIds = new Set(regs.map(r => r.id));
-      localNow.forEach(r => { if (!fbIds.has(r.id)) regs.push(r); });
-      const live = regs.filter(r => !r.expiresAt || r.expiresAt > Date.now());
+    // Fetch from Firebase for cross-device sync
+    if (window.FB) {
+      const { getDocs, collection, query, where, db } = window.FB;
+      const timeout = new Promise((_, rej) => setTimeout(() => rej('timeout'), 8000));
+      Promise.race([
+        getDocs(query(collection(db, 'requests'), where('churchId', '==', churchId))),
+        timeout
+      ]).then(snap => {
+        const regs = [];
+        snap.forEach(d => { const data = d.data(); data._fbId = d.id; regs.push(data); });
+        const localNow = LS.get(key, []);
+        const fbIds = new Set(regs.map(r => r.id));
+        localNow.forEach(r => { if (!fbIds.has(r.id)) regs.push(r); });
+        const live = regs.filter(r => !r.expiresAt || r.expiresAt > Date.now());
         LS.set(key, live);
         if (typeof renderReqList === 'function') renderReqList(live, document.getElementById('rl'));
       }).catch(() => {});
@@ -7308,14 +7613,17 @@ document.addEventListener('DOMContentLoaded', function() {
   requestPushPermission();
   renderMemberApprovalBadge();
 
-  // ── Google Sheets connection status indicator ──
-  window.GS.getAll('admins').then(function(){
+  // ── GOOGLE SHEETS: connection status indicator ──
+  function initFirebase() {
     const statusEl = document.getElementById('fb-status');
-    if(statusEl){ statusEl.className='fb-status ok'; statusEl.textContent='✓ Connected'; setTimeout(function(){ statusEl.style.opacity='0'; },3000); }
-  }).catch(function(){
-    const statusEl = document.getElementById('fb-status');
-    if(statusEl){ statusEl.className='fb-status err'; statusEl.textContent='⚠️ Offline — check internet'; }
-  });
+    if (!window.FB) {
+      if (statusEl) { statusEl.className='fb-status err'; statusEl.textContent='⚠️ Offline — Google Sheets sync unavailable'; }
+      return;
+    }
+    if (statusEl) { statusEl.className='fb-status ok'; statusEl.textContent='✓ Google Sheets connected'; setTimeout(()=>{ statusEl.style.opacity='0'; },3000); }
+  }
+  if (window.FB_READY) { initFirebase(); }
+  else { window.addEventListener('fb-ready', initFirebase, { once: true }); }
 });
 
 /* ═══════════════════════════════════════════════════════════════
@@ -7353,34 +7661,29 @@ function saSwTab(btn, sec) {
   if (sec === 'sa-sec-log') { const el=document.getElementById('sa-log-e'); if(el) { if(typeof window.renderLogInto==='function') window.renderLogInto(el); else renderLogInto(el); } }
 }
 function renderSAStats() {
-  // Fetch live counts from Google Sheets
-  Promise.all([
-    window.GS.getAll('admins').catch(function(){ return []; }),
-    window.GS.getAll('subscription_requests').catch(function(){ return []; }),
-    window.GS.getAll('church_registrations').catch(function(){ return []; })
-  ]).then(function(results){
-    var gsAdmins = results[0]; var gsPending = results[1]; var gsChurches = results[2];
-    var allA = LS.get('sda-admins',[]);
-    var approved = gsAdmins.filter(function(a){ return a.role==='admin'; });
-    var localPending = gsPending.filter(function(a){ return a.role==='pending_admin'; });
-    var approvedChurches = gsChurches.filter(function(c){ return c.status==='approved'; });
-    _doRenderSAStats(allA, approved, localPending, approvedChurches);
-  });
-}
-function _doRenderSAStats(allA, approved, localPending, approvedChurches) {
+  const allA = LS.get('sda-admins', []);
+  const churches = LS.get('sda-church-registrations', []);
+  const approved = allA.filter(a => a.role === 'admin');
+  const localPending = allA.filter(a => a.role === 'pending_admin');
+  const approvedChurches = churches.filter(c => c.status === 'approved');
   const el = id => document.getElementById(id);
   if(el('sa-churches')) el('sa-churches').textContent = approvedChurches.length;
   if(el('sa-admins'))   el('sa-admins').textContent   = approved.length;
   if(el('sa-pending'))  el('sa-pending').textContent  = localPending.length;
-  // Fetch accurate counts from Google Sheets
-  window.GS.getAll('subscription_requests').then(function(rows){
-    var cnt = rows.filter(function(r){ return r.role==='pending_admin'; }).length;
-    if(el('sa-pending')) el('sa-pending').textContent = cnt; renderSubBadge(cnt);
-  }).catch(function(){});
-  window.GS.getAll('church_registrations').then(function(rows){
-    var approved = rows.filter(function(r){ return r.status==='approved'; }).length;
-    if(el('sa-churches')) el('sa-churches').textContent = approved;
-  })
+  // Fetch accurate counts from Firebase
+  if (window.FB) {
+    const { getDocs, collection, query, where, db } = window.FB;
+    // Pending subscription requests
+    getDocs(query(collection(db, 'subscription_requests'), where('role', '==', 'pending_admin')))
+      .then(snap => { if(el('sa-pending')) el('sa-pending').textContent = snap.size; renderSubBadge(snap.size); })
+      .catch(() => {});
+    // All approved church registrations
+    getDocs(collection(db, 'church_registrations'))
+      .then(snap => {
+        let approved = 0;
+        snap.forEach(d => { if(d.data().status === 'approved') approved++; });
+        if(el('sa-churches')) el('sa-churches').textContent = approved;
+      })
       .catch(() => {});
     // All approved admins
     getDocs(query(collection(db, 'subscription_requests'), where('role', '==', 'admin')))
@@ -7504,7 +7807,7 @@ function recordAttendance() {
 }
 
 /* Prayer wall */
-// ═══ FIREBASE FIRESTORE — Prayer Wall ═══
+// ═══ GOOGLE SHEETS — Prayer Wall ═══
 function submitPrayerWall() {
   const text    = (document.getElementById('pw-msg')?.value  || '').trim();
   const type    =  document.getElementById('pw-type')?.value || 'prayer';
@@ -7522,7 +7825,10 @@ function submitPrayerWall() {
   const nameInp = document.getElementById('pw-name'); if (nameInp) nameInp.value = '';
   toast(type === 'praise' ? '🙌 Praise shared!' : '🙏 Prayer posted!');
   renderPrayerWall(all);
-  window.GS.add('prayerwall', env).catch(function(){});
+  if (window.FB) {
+    const {addDoc, collection, serverTimestamp, db} = window.FB;
+    addDoc(collection(db,'prayerwall'), Object.assign({}, env, {ts: serverTimestamp()})).catch(()=>{});
+  }
 }
 function loadFirestorePrayerWall(filter) {
   const churchId = getChurchId();
@@ -7532,13 +7838,20 @@ function loadFirestorePrayerWall(filter) {
   const local = LS.get(key, []).filter(p => !p.expiresAt || p.expiresAt > now);
   const _filter = filter;
   renderPrayerWall(_filter && _filter !== 'all' ? local.filter(p => p.type === _filter) : local);
-  // Fetch from Google Sheets for cross-device sync
-  window.GS.getAll('prayerwall').then(function(rows){
-    const regs = rows.filter(function(p){ return p.churchId===churchId; });
-    const localNow = LS.get(key, []);
-    const fbIds = new Set(regs.map(r => r.id));
-    localNow.forEach(r => { if (!fbIds.has(r.id)) regs.push(r); });
-    const live = regs.filter(p => !p.expiresAt || p.expiresAt > Date.now());
+  // Fetch from Firebase for cross-device sync
+  if (window.FB) {
+    const { getDocs, collection, query, where, db } = window.FB;
+    const timeout = new Promise((_, rej) => setTimeout(() => rej('timeout'), 8000));
+    Promise.race([
+      getDocs(query(collection(db, 'prayerwall'), where('churchId', '==', churchId))),
+      timeout
+    ]).then(snap => {
+      const regs = [];
+      snap.forEach(d => { const data = d.data(); data._fbId = d.id; regs.push(data); });
+      const localNow = LS.get(key, []);
+      const fbIds = new Set(regs.map(r => r.id));
+      localNow.forEach(r => { if (!fbIds.has(r.id)) regs.push(r); });
+      const live = regs.filter(p => !p.expiresAt || p.expiresAt > Date.now());
       LS.set(key, live);
       renderPrayerWall(_filter && _filter !== 'all' ? live.filter(p => p.type === _filter) : live);
     }).catch(() => {});
@@ -7559,7 +7872,7 @@ function filterPW(f) { loadFirestorePrayerWall(f); }
 function prayForItem(id)   { if (!currentMember) { toast('🔒 Login to pray.'); return; } toast('🙏 Praying with you!'); }
 function praiseForItem(id) { if (!currentMember) { toast('🔒 Login to praise.'); return; } toast('🙌 Praise God!'); }
 
-// ═══ FIREBASE FIRESTORE — Testimonies ═══
+// ═══ GOOGLE SHEETS — Testimonies ═══
 function submitTestimony() {
   const body    = (document.getElementById('test-body')?.value  || '').trim();
   const rawName = (document.getElementById('test-name')?.value || '').trim();
@@ -7575,7 +7888,10 @@ function submitTestimony() {
   clearTestFields();
   toast('🙌 Testimony shared! God is good!');
   renderTestimonies(all);
-  window.GS.add('testimonies', env).catch(function(){});
+  if (window.FB) {
+    const {addDoc, collection, serverTimestamp, db} = window.FB;
+    addDoc(collection(db,'testimonies'), Object.assign({}, env, {ts: serverTimestamp()})).catch(()=>{});
+  }
 }
 function clearTestFields() {
   ['test-name','test-min','test-body'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
@@ -7586,13 +7902,20 @@ function loadFirestoreTestimonies() {
   const key = 'sda-testimonies-' + churchId;
   // Show local cache instantly
   renderTestimonies(LS.get(key, []).filter(t => !t.expiresAt || t.expiresAt > now));
-  // Fetch from Google Sheets for cross-device sync
-  window.GS.getAll('testimonies').then(function(rows){
-    const regs = rows.filter(function(t){ return t.churchId===churchId; });
-    const localNow = LS.get(key, []);
-    const fbIds = new Set(regs.map(r => r.id));
-    localNow.forEach(r => { if (!fbIds.has(r.id)) regs.push(r); });
-    const live = regs.filter(t => !t.expiresAt || t.expiresAt > Date.now());
+  // Fetch from Firebase for cross-device sync
+  if (window.FB) {
+    const { getDocs, collection, query, where, db } = window.FB;
+    const timeout = new Promise((_, rej) => setTimeout(() => rej('timeout'), 8000));
+    Promise.race([
+      getDocs(query(collection(db, 'testimonies'), where('churchId', '==', churchId))),
+      timeout
+    ]).then(snap => {
+      const regs = [];
+      snap.forEach(d => { const data = d.data(); data._fbId = d.id; regs.push(data); });
+      const localNow = LS.get(key, []);
+      const fbIds = new Set(regs.map(r => r.id));
+      localNow.forEach(r => { if (!fbIds.has(r.id)) regs.push(r); });
+      const live = regs.filter(t => !t.expiresAt || t.expiresAt > Date.now());
       LS.set(key, live);
       renderTestimonies(live);
     }).catch(() => {});
@@ -7726,8 +8049,12 @@ function submitChurchRegistration() {
   regs.push(reg);
   LS.set('sda-church-registrations', regs);
 
-  // Save to Google Sheets
-  window.GS.add('church_registrations', reg).catch(function(){});
+  // Try to save to Firebase if available
+  if (window.FB) {
+    const { addDoc, collection, serverTimestamp, db } = window.FB;
+    addDoc(collection(db, 'church_registrations'), Object.assign({}, reg, { ts: serverTimestamp() }))
+      .catch(() => {});
+  }
 
   // Show success screen
   const formEl = document.getElementById('reg-church-form');
@@ -7824,14 +8151,19 @@ function renderChurchRegAdmin() {
   } else {
     renderList(cached);
   }
-  window.GS.getAll('church_registrations').then(function(regs){
-    const local = LS.get('sda-church-registrations', []);
-    const fbIds = new Set(regs.map(r => r.id));
-    local.forEach(r => { if (!fbIds.has(r.id)) regs.push(r); });
-    LS.set('sda-church-registrations', regs);
-    regs.sort((a,b) => (b.submittedAtMs||0) - (a.submittedAtMs||0));
-    renderList(regs);
-  })
+  if (window.FB) {
+    const { getDocs, collection, db } = window.FB;
+    getDocs(collection(db, 'church_registrations'))
+      .then(snap => {
+        const regs = [];
+        snap.forEach(d => { const data = d.data(); data._fbId = d.id; regs.push(data); });
+        const local = LS.get('sda-church-registrations', []);
+        const fbIds = new Set(regs.map(r => r.id));
+        local.forEach(r => { if (!fbIds.has(r.id)) regs.push(r); });
+        LS.set('sda-church-registrations', regs);
+        regs.sort((a,b) => (b.submittedAtMs||0) - (a.submittedAtMs||0));
+        renderList(regs);
+      })
       .catch(() => {});
   }
 }
@@ -7859,8 +8191,13 @@ function approveChurchReg(id) {
       }
     }
   }
-  // Update in Google Sheets
-  window.GS.update('church_registrations', id, {status:'approved',approvedBy:'SEVENTHDAYADVENTIST',approvedAt:new Date().toISOString()}).catch(function(){});
+  // Update in Firebase
+  if (window.FB) {
+    const { getDocs, collection, query, where, updateDoc, doc, db } = window.FB;
+    getDocs(query(collection(db,'church_registrations'), where('id','==',id)))
+      .then(snap => { snap.forEach(d => updateDoc(doc(db,'church_registrations',d.id), {status:'approved',approvedBy:'SEVENTHDAYADVENTIST',approvedAt:new Date().toISOString()}).catch(()=>{})); })
+      .catch(()=>{});
+  }
   if (typeof toast === 'function') toast('✅ Church registration approved!');
   if (typeof addLog === 'function') addLog('Approved church reg: ' + id);
   renderChurchRegAdmin();
@@ -7871,7 +8208,12 @@ function rejectChurchReg(id) {
   const regs = LS.get('sda-church-registrations', []);
   const filtered = regs.filter(r => r.id !== id);
   LS.set('sda-church-registrations', filtered);
-  window.GS.del('church_registrations', id).catch(function(){});
+  if (window.FB) {
+    const { getDocs, collection, query, where, deleteDoc, doc, db } = window.FB;
+    getDocs(query(collection(db,'church_registrations'), where('id','==',id)))
+      .then(snap => { snap.forEach(d => deleteDoc(doc(db,'church_registrations',d.id)).catch(()=>{})); })
+      .catch(()=>{});
+  }
   if (typeof toast === 'function') toast('❌ Church registration rejected.');
   if (typeof addLog === 'function') addLog('Rejected church reg: ' + id);
   renderChurchRegAdmin();
