@@ -3660,36 +3660,73 @@ function pruneExpiredAdmins(){
 }
 function doLogin(){
   setErr('login-err','');
-  pruneExpiredAdmins();
-  admins=LS.get('sda-admins',[]);
   const u=(document.getElementById('au').value||'').trim();
   const p=document.getElementById('ap').value||'';
   if(!u||!p){setErr('login-err','Please enter both username and password.');return}
-  let found=admins.find(a=>a.u===u&&a.p===p);
-  if(!found){
-    setErr('login-err','Incorrect username or password.');
-    return;
+  setErr('login-err','⏳ Checking...');
+
+  function _loginWith(found) {
+    if(!found){ setErr('login-err','Incorrect username or password.'); return; }
+    if(!found.churchId && found.church){ found.churchId = makeChurchId(found.church); }
+    if(adminExpired(found)){ setErr('login-err','This admin account expired. Please subscribe again to renew.'); return; }
+    if(found.role==='pending_admin'){ setErr('login-err','⏳ Your request is pending superadmin approval.'); return; }
+    // Cache to localStorage for session restore
+    const allA = LS.get('sda-admins',[]);
+    const idx2 = allA.findIndex(a=>a.u===found.u);
+    if(idx2>=0){ allA[idx2]=found; } else { allA.push(found); }
+    LS.set('sda-admins', allA);
+    admins = allA;
+    setErr('login-err','');
+    const dl=adminDaysLeft(found);
+    openDash(found);
+    toast('Welcome back, '+found.n+' 👋'+(dl!==null?' · '+dl+' day'+(dl!==1?'s':'')+' remaining':''),4500);
+    addLog('Login: '+found.n+(dl!==null?' ('+dl+'d left)':''));
   }
-  // Ensure churchId is always set — fix missing churchId from old registrations
-  if(!found.churchId && found.church){
-    found.churchId = makeChurchId(found.church);
-    // Persist the fix
-    const allA=LS.get('sda-admins',[]);
-    const idx=allA.findIndex(a=>a.u===found.u);
-    if(idx>=0){allA[idx].churchId=found.churchId; LS.set('sda-admins',allA);}
+
+  // Try Firebase first (cross-device) — fall back to localStorage
+  if(window.FB){
+    const {getDocs, collection, db} = window.FB;
+    getDocs(collection(db,'subscription_requests'))
+      .then(function(snap){
+        var fbFound = null;
+        snap.forEach(function(d){
+          var a = d.data();
+          if(a.u===u && a.p===p){ a._fbId=d.id; fbFound=a; }
+        });
+        if(fbFound){
+          _loginWith(fbFound);
+        } else {
+          // Not in subscription_requests — check admins collection
+          getDocs(collection(db,'admins'))
+            .then(function(snap2){
+              var fbFound2 = null;
+              snap2.forEach(function(d){
+                var a = d.data();
+                if(a.u===u && a.p===p){ a._fbId=d.id; fbFound2=a; }
+              });
+              if(fbFound2){
+                _loginWith(fbFound2);
+              } else {
+                // Final fallback: localStorage
+                pruneExpiredAdmins();
+                admins=LS.get('sda-admins',[]);
+                _loginWith(admins.find(a=>a.u===u&&a.p===p)||null);
+              }
+            }).catch(function(){ pruneExpiredAdmins(); admins=LS.get('sda-admins',[]); _loginWith(admins.find(a=>a.u===u&&a.p===p)||null); });
+        }
+      })
+      .catch(function(){
+        // Firebase failed — use localStorage
+        pruneExpiredAdmins();
+        admins=LS.get('sda-admins',[]);
+        _loginWith(admins.find(a=>a.u===u&&a.p===p)||null);
+      });
+  } else {
+    // No Firebase — use localStorage
+    pruneExpiredAdmins();
+    admins=LS.get('sda-admins',[]);
+    _loginWith(admins.find(a=>a.u===u&&a.p===p)||null);
   }
-  if(adminExpired(found)){
-    setErr('login-err','This admin account expired. Please subscribe again to renew.');
-    return;
-  }
-  if(found.role==='pending_admin'){
-    setErr('login-err','⏳ Your subscription request is pending approval by THABO1. Please check back soon.');
-    return;
-  }
-  const dl=adminDaysLeft(found);
-  openDash(found);
-  toast('Welcome back, '+found.n+' 👋'+(dl!==null?' · '+dl+' day'+(dl!==1?'s':'')+' remaining':''),4500);
-  addLog('Login: '+found.n+(dl!==null?' ('+dl+'d left)':''));
 }
 function doRegister(){
   setErr('reg-err','');
@@ -3768,9 +3805,8 @@ function submitSubscription() {
     subSubmittedAt: Date.now(),
     subAmount: 500
   };
-  allA.push(req);
-  LS.set('sda-admins', allA);
-  admins = allA;
+  // NOTE: NOT saving to localStorage — Firebase is the source of truth
+  // Only save once approved (doApproveSub will cache locally then)
   // Save to Firestore so superadmin sees it across ALL devices
   // Build the Firebase record once (no password)
   var _fbReq = Object.assign({}, req);
@@ -3887,30 +3923,30 @@ function renderSubRequests() {
   }
   if (typeof window.renderChurchRegAdmin === 'function') window.renderChurchRegAdmin();
   const el=document.getElementById('subs-list'); if(!el)return;
-  // Show loading state
   el.innerHTML='<div style="text-align:center;padding:20px;color:var(--text3);font-size:13px">⏳ Loading requests...</div>';
-  // Pull from Firestore first (cross-device)
   if(window.FB){
-    // No where() clause — get all docs and filter client-side
-    // where() requires a Firestore index which causes silent failures
-    const {getDocs, collection, db} = window.FB;
-    getDocs(collection(db,'subscription_requests'))
-      .then(snap=>{
+    const {onSnapshot, collection, db} = window.FB;
+    // Cancel any previous listener
+    if(window._subUnsubscribe) { window._subUnsubscribe(); window._subUnsubscribe=null; }
+    // Real-time listener — updates automatically when new subscriptions come in
+    window._subUnsubscribe = onSnapshot(
+      collection(db,'subscription_requests'),
+      function(snap){
         const fbPending=[];
         snap.forEach(d=>{ const data=d.data(); data._fbId=d.id; if(data.role==='pending_admin') fbPending.push(data); });
-        // Merge with any local-only entries not yet in Firestore
+        // Merge any local-only entries not yet in Firestore
         const local=LS.get('sda-admins',[]).filter(a=>a.role==='pending_admin');
         const allUsers=new Set(fbPending.map(a=>a.u));
         local.forEach(a=>{ if(!allUsers.has(a.u)) fbPending.push(a); });
         _renderSubList(fbPending);
-      })
-      .catch(function(err){
-        console.warn('SDA: renderSubRequests Firebase failed:', err);
+      },
+      function(err){
+        console.warn('SDA: subscription listener failed:', err);
         const local=LS.get('sda-admins',[]).filter(a=>a.role==='pending_admin');
         _renderSubList(local);
-      });
+      }
+    );
   } else {
-    // No Firebase — use localStorage only
     const local=LS.get('sda-admins',[]).filter(a=>a.role==='pending_admin');
     _renderSubList(local);
   }
@@ -3923,7 +3959,6 @@ function approveSubRequest(username, fbId) {
   }
   const all=LS.get('sda-admins',[]);
   const idx=all.findIndex(a=>a.u===username&&a.role==='pending_admin');
-  // Update localStorage if present
   if(idx>=0){
     all[idx].role='admin';
     all[idx].registeredAt=Date.now();
@@ -3931,6 +3966,23 @@ function approveSubRequest(username, fbId) {
     all[idx].approvedAt=Date.now();
     LS.set('sda-admins',all);
     admins=all;
+  }
+  // Save approved admin to Firebase admins collection (cross-device login)
+  if(window.FB && fbId){
+    var _pendingData = null;
+    // Get the pending doc data first
+    window.FB.getDocs(window.FB.collection(window.FB.db,'subscription_requests'))
+      .then(function(snap){
+        snap.forEach(function(d){ if(d.id===fbId) _pendingData=d.data(); });
+        if(_pendingData){
+          _pendingData.role='admin';
+          _pendingData.approvedBy='SEVENTHDAYADVENTIST';
+          _pendingData.approvedAt=Date.now();
+          _pendingData.registeredAt=Date.now();
+          // Write to admins collection
+          window.FB.addDoc(window.FB.collection(window.FB.db,'admins'), _pendingData).catch(function(){});
+        }
+      }).catch(function(){});
   }
   // Delete from Firestore subscription_requests and write to admins collection
   if(window.FB && fbId){
@@ -4004,6 +4056,7 @@ window.renderSubBadge = renderSubBadge;
 
 
 function doLogout(){
+  if(window._subUnsubscribe){ window._subUnsubscribe(); window._subUnsubscribe=null; }
   currentAdmin=null;
   try{ localStorage.removeItem('sda-admin-session'); }catch(_){}
   document.getElementById('adash').style.display='none';
@@ -5988,7 +6041,7 @@ function closeLB(){document.getElementById('lb').classList.remove('on');document
 function swSec(btn,sec){
   if(sec==='subs'){
     var currentA2=window._currentAdminRef?window._currentAdminRef():null;
-    var _isSA2 = typeof isSuperAdmin==='function' ? isSuperAdmin(currentA2) : (currentA2&&currentA2.u==='SEVENTHDAYADVENTIST');
+    var _isSA2 = currentA2 && currentA2.u === 'SEVENTHDAYADVENTIST';
     if(!currentA2||!_isSA2){ toast('\uD83D\uDD12 Superadmin access only.'); return; }
   }
   ['media','acts','miss','stream','pa','ra','log','adms'].forEach(s=>{const el=document.getElementById('sec-'+s);if(el)el.style.display='none'});
@@ -6061,7 +6114,7 @@ function renderLog(){
 function isSuperAdmin(a) {
   a = a || currentAdmin;
   if (!a) return false;
-  return a.role === 'superadmin' || a.u === 'SEVENTHDAYADVENTIST';
+  return a.u === 'SEVENTHDAYADVENTIST';
 }
 function isApprovedAdmin(a) {
   a = a || currentAdmin;
@@ -7528,7 +7581,7 @@ function renderSAStats() {
 }
 function renderSAAdmins() {
   const el = document.getElementById('sa-adms-list'); if (!el) return;
-  const _isSAFn = typeof window.isSuperAdmin === "function" ? window.isSuperAdmin : function(a){ const u=(a&&a.u||"").toUpperCase(); return a&&(a.role==="superadmin"||u==="SEVENTHDAYADVENTIST"); };
+  const _isSAFn = typeof window.isSuperAdmin === "function" ? window.isSuperAdmin : function(a){ const u=(a&&a.u||"").toUpperCase(); return a&&(u==="SEVENTHDAYADVENTIST"); };
   const _expFn = typeof window.adminExpired === "function" ? window.adminExpired : function(){ return false; };
   const allA = LS.get('sda-admins', []).filter(a => !_expFn(a) && a.role !== 'pending_admin' && !_isSAFn(a));
   if (!allA.length) { el.innerHTML = '<div class="empty"><span class="empty-ico">👤</span><strong>No admin accounts yet</strong></div>'; return; }
