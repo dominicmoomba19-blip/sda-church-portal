@@ -5531,6 +5531,8 @@ function renderPublicMedia(){
       var now2=Date.now();
       var existingUrls=new Set(mediaItems.map(function(m){return m.downloadURL||m.url||'';}));
       rows.forEach(function(m){
+        // Normalise mediaType → type for old GS records
+        if (!m.type && m.mediaType) { m.type = m.mediaType; }
         if(m.expiresAt&&m.expiresAt<now2)return;
         var mUrl=m.downloadURL||m.url||'';
         if(!mUrl||existingUrls.has(mUrl))return;
@@ -5833,6 +5835,8 @@ async function loadPersistedMedia(){
       var existingUrls = new Set(mediaItems.map(function(m){ return m.downloadURL || m.url || ''; }));
       var added = 0;
       rows.forEach(function(m) {
+        // Normalise mediaType → type for old GS records saved before this fix
+        if (!m.type && m.mediaType) { m.type = m.mediaType; }
         // Supabase rows use snake_case — normalise to camelCase
         if (source === 'supabase') {
           m = {
@@ -6381,15 +6385,16 @@ function handleAudio(inp){
   _uploadToStorage(f,sp,function(pct){_mediaShowProgress('audio',pct,'"'+title+'" \u2014 '+pct+'%');})
   .then(function(dlURL){
       var _cka='ck_'+Date.now()+'_'+Math.random().toString(36).slice(2);
-      if(GS_CONFIGURED){_gsPost('addDoc','media',Object.assign({},rec,{downloadURL:dlURL,storagePath:sp})).catch(function(){});}
-      // Save to localStorage so audio survives reload
-    var savedA=JSON.parse(localStorage.getItem('sda-media-cloud')||'[]');
-    var _audioSrc = dlURL.indexOf('supabase') !== -1 ? 'supabase' : 'cloudinary';
-    var _audioMeta={type:'audio',url:dlURL,title:title,preacher:preacher,size:f.size,church:rec.church,churchId:rec.churchId,dist:rec.dist,postedBy:rec.postedBy,postedAt:rec.postedAt,postedAtMs:rec.postedAtMs,expiresAt:rec.expiresAt,uploadedDate:rec.uploadedDate,source:_audioSrc,_delKey:_cka};
-    savedA.push(_audioMeta);
-    try{localStorage.setItem('sda-media-cloud',JSON.stringify(savedA));}catch(e){}
-    _supabaseSaveMeta(_audioMeta);
-    onSuccess(dlURL,_audioSrc);
+      var _audioSrc = dlURL.indexOf('supabase') !== -1 ? 'supabase' : 'cloudinary';
+      // Build the full record with type:'audio' (rec only has mediaType:'audio')
+      var _audioMeta={type:'audio',url:dlURL,downloadURL:dlURL,title:title,preacher:preacher,size:f.size,church:rec.church,churchId:rec.churchId,dist:rec.dist,postedBy:rec.postedBy,postedAt:rec.postedAt,postedAtMs:rec.postedAtMs,expiresAt:rec.expiresAt,uploadedDate:rec.uploadedDate,source:_audioSrc,_delKey:_cka};
+      // ✅ GS save uses _audioMeta so type:'audio' is stored correctly
+      if(GS_CONFIGURED){_gsPost('addDoc','media',_audioMeta).catch(function(){});}
+      var savedA=JSON.parse(localStorage.getItem('sda-media-cloud')||'[]');
+      savedA.push(_audioMeta);
+      try{localStorage.setItem('sda-media-cloud',JSON.stringify(savedA));}catch(e){}
+      _supabaseSaveMeta(_audioMeta);
+      onSuccess(dlURL,_audioSrc);
     })
     .catch(function(){
       f.arrayBuffer().then(function(buf){
@@ -6430,10 +6435,12 @@ function handleVideo(inp){
   _uploadToStorage(f,sp,function(pct){_mediaShowProgress('video',pct,'"'+title+'" \u2014 '+pct+'%');})
   .then(function(dlURL){
       var _ckv='ck_'+Date.now()+'_'+Math.random().toString(36).slice(2);
-      if(GS_CONFIGURED){_gsPost('addDoc','media',Object.assign({},rec,{downloadURL:dlURL,storagePath:sp})).catch(function(){});}
-      var savedV=JSON.parse(localStorage.getItem('sda-media-cloud')||'[]');
       var _videoSrc = dlURL.indexOf('supabase') !== -1 ? 'supabase' : 'cloudinary';
-      var _videoMeta={type:'video',url:dlURL,title:title,preacher:preacher,size:f.size,church:rec.church,churchId:rec.churchId,dist:rec.dist,postedBy:rec.postedBy,postedAt:rec.postedAt,postedAtMs:rec.postedAtMs,expiresAt:rec.expiresAt,uploadedDate:rec.uploadedDate,source:_videoSrc,_delKey:_ckv};
+      // Build the full record with type:'video' (rec only has mediaType:'video')
+      var _videoMeta={type:'video',url:dlURL,downloadURL:dlURL,title:title,preacher:preacher,size:f.size,church:rec.church,churchId:rec.churchId,dist:rec.dist,postedBy:rec.postedBy,postedAt:rec.postedAt,postedAtMs:rec.postedAtMs,expiresAt:rec.expiresAt,uploadedDate:rec.uploadedDate,source:_videoSrc,_delKey:_ckv};
+      // ✅ GS save uses _videoMeta so type:'video' is stored correctly
+      if(GS_CONFIGURED){_gsPost('addDoc','media',_videoMeta).catch(function(){});}
+      var savedV=JSON.parse(localStorage.getItem('sda-media-cloud')||'[]');
       savedV.push(_videoMeta);
       try{localStorage.setItem('sda-media-cloud',JSON.stringify(savedV));}catch(e){}
       _supabaseSaveMeta(_videoMeta);
@@ -7441,9 +7448,12 @@ function submitReq() {
   const rawName = (document.getElementById('r-name')?.value || '').trim();
   const type    = document.getElementById('r-type')?.value || 'Announcement';
   const env = makePostEnvelope({ msg, type, expiresAt: Date.now() + DAY2_MS });
-  env.name = rawName || env.postedBy || 'Anonymous';
-  env.id   = 'r' + Date.now();
-  env.time = env.postedAt;
+  env.name   = rawName || env.postedBy || 'Anonymous';
+  env.id     = 'r' + Date.now();
+  env.time   = env.postedAt;
+  // Ensure church name is stored so other devices can display it
+  env.church = (currentAdmin && currentAdmin.church) || (currentMember && currentMember.church) ||
+    (() => { try { return JSON.parse(localStorage.getItem('sda-church')||'null')?.church||''; } catch(_){return '';} })();
   const key = 'sda-reqs-' + env.churchId;
   const arr = LS.get(key, []).filter(r => !r.expiresAt || r.expiresAt > Date.now());
   arr.push(env);
@@ -7789,25 +7799,34 @@ function nav(p) {
     if (typeof renderReqList === 'function') renderReqList(arr, document.getElementById('rl'));
     // Fetch from Google Sheets for cross-device sync
     if (GS_CONFIGURED) {
-      _gsGet('getDocs', 'requests', {filters: JSON.stringify({churchId: churchId})}).then(function(res) {
+      // Fetch ALL requests then filter client-side (handles churchId format mismatches)
+      _gsGet('getDocs', 'requests').then(function(res) {
         var rawDocs = (res && Array.isArray(res.docs)) ? res.docs : [];
-        var gsRows = rawDocs.map(function(d){ return Object.assign({}, d.data || d, {_gsId: d.id}); });
+        var allRows = rawDocs.map(function(d){ return Object.assign({}, d.data || d, {_gsId: d.id}); });
+        // Match by churchId OR by church name fallback
+        var gsRows = allRows.filter(function(r){
+          return r.churchId === churchId ||
+            (r.church && makeChurchId(r.church) === churchId);
+        });
         var localNow = LS.get(key, []);
         var gsIds = new Set(gsRows.map(function(r){ return r.id; }));
         localNow.forEach(function(r){ if (!gsIds.has(r.id)) gsRows.push(r); });
         var live = gsRows.filter(function(r){ return !r.expiresAt || r.expiresAt > Date.now(); });
-        LS.set(key, live);
-        if (typeof renderReqList === 'function') renderReqList(live, document.getElementById('rl'));
+        if (live.length) {
+          LS.set(key, live);
+          if (typeof renderReqList === 'function') renderReqList(live, document.getElementById('rl'));
+        }
       }).catch(function() {
-        // GS failed — try Supabase if configured
+        // GS failed — try Supabase
         if (SUPABASE_CONFIGURED && supabaseClient) {
-          supabaseClient.from('requests').select('*')
-            .eq('church_id', churchId)
-            .then(function(r) {
-              if (r.error || !r.data) return;
-              var live = r.data.filter(function(req){ return !req.expires_at || new Date(req.expires_at) > new Date(); });
-              if (live.length && typeof renderReqList === 'function') renderReqList(live, document.getElementById('rl'));
-            }).catch(function(){});
+          supabaseClient.from('requests').select('*').then(function(r) {
+            if (r.error || !r.data) return;
+            var live = r.data.filter(function(req){
+              return (req.church_id === churchId || makeChurchId(req.church||'') === churchId) &&
+                (!req.expires_at || new Date(req.expires_at) > new Date());
+            });
+            if (live.length && typeof renderReqList === 'function') renderReqList(live, document.getElementById('rl'));
+          }).catch(function(){});
         }
       });
     }
@@ -8187,6 +8206,8 @@ function submitTestimony() {
   env.author = rawName || env.postedBy || 'Anonymous';
   env.id     = 't' + Date.now();
   env.at     = env.postedAt;
+  env.church = (currentAdmin && currentAdmin.church) || (currentMember && currentMember.church) ||
+    (() => { try { return JSON.parse(localStorage.getItem('sda-church')||'null')?.church||''; } catch(_){return '';} })();
   const key  = 'sda-testimonies-' + env.churchId;
   const all  = LS.get(key, []).filter(t => !t.expiresAt || t.expiresAt > Date.now());
   all.push(env);
@@ -8207,26 +8228,29 @@ function loadFirestoreTestimonies() {
   renderTestimonies(LS.get(key, []).filter(t => !t.expiresAt || t.expiresAt > now));
   // Fetch from Google Sheets for cross-device sync
   if (GS_CONFIGURED) {
-    _gsGet('getDocs', 'testimonies', {filters: JSON.stringify({churchId: churchId})}).then(function(res) {
-      // GS returns {ok:true, docs:[{id, data:{...}, ts}]}
+    // Fetch ALL then client-side filter — avoids churchId format mismatch issues
+    _gsGet('getDocs', 'testimonies').then(function(res) {
       var rawDocs = (res && Array.isArray(res.docs)) ? res.docs : [];
-      var gsRows = rawDocs.map(function(d){ return Object.assign({}, d.data || d, {_gsId: d.id}); });
+      var allRows = rawDocs.map(function(d){ return Object.assign({}, d.data || d, {_gsId: d.id}); });
+      var gsRows = allRows.filter(function(t){
+        return t.churchId === churchId || (t.church && makeChurchId(t.church) === churchId);
+      });
       var localNow = LS.get(key, []);
       var gsIds = new Set(gsRows.map(function(r){ return r.id; }));
       localNow.forEach(function(r){ if (!gsIds.has(r.id)) gsRows.push(r); });
       var live = gsRows.filter(function(t){ return !t.expiresAt || t.expiresAt > Date.now(); });
-      LS.set(key, live);
-      renderTestimonies(live);
+      if (live.length) { LS.set(key, live); renderTestimonies(live); }
     }).catch(function() {
       // GS failed — try Supabase
       if (SUPABASE_CONFIGURED && supabaseClient) {
-        supabaseClient.from('testimonies').select('*')
-          .eq('church_id', churchId)
-          .then(function(r) {
-            if (r.error || !r.data) return;
-            var live = r.data.filter(function(t){ return !t.expires_at || new Date(t.expires_at) > new Date(); });
-            if (live.length) renderTestimonies(live);
-          }).catch(function(){});
+        supabaseClient.from('testimonies').select('*').then(function(r) {
+          if (r.error || !r.data) return;
+          var live = r.data.filter(function(t){
+            return (t.church_id === churchId || makeChurchId(t.church||'') === churchId) &&
+              (!t.expires_at || new Date(t.expires_at) > new Date());
+          });
+          if (live.length) renderTestimonies(live);
+        }).catch(function(){});
       }
     });
   }
