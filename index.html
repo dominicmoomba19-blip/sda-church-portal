@@ -4790,22 +4790,17 @@ window.doLogin=function(){
   }
 };
 function renderMiss(){
-  if (window.FB && !renderMiss._syncing) {
+  if (GS_CONFIGURED && !renderMiss._syncing) {
     renderMiss._syncing = true;
-    const { getDocs, collection, db } = window.FB;
-    const timeout = new Promise((_, rej) => setTimeout(() => rej('timeout'), 8000));
-    Promise.race([getDocs(collection(db, 'missions')), timeout])
-      .then(snap => {
-        const fbMiss = [];
-        snap.forEach(d => { const data = d.data(); data._fbId = d.id; fbMiss.push(data); });
+    _gsGet('getDocs', 'missions').then(res => {
+        const rows = Array.isArray(res) ? res : (res && Array.isArray(res.docs) ? res.docs.map(d => d.data) : []);
         const local = LS.get('x-miss', []);
-        const fbIds = new Set(fbMiss.map(m => m.id));
-        local.forEach(m => { if (!fbIds.has(m.id)) fbMiss.push(m); });
-        LS.set('x-miss', fbMiss);
+        const gsIds = new Set(rows.map(m => m.id));
+        local.forEach(m => { if (!gsIds.has(m.id)) rows.push(m); });
+        LS.set('x-miss', rows);
         renderMiss._syncing = false;
         renderMiss();
-      })
-      .catch(() => { renderMiss._syncing = false; });
+      }).catch(() => { renderMiss._syncing = false; });
   }
   const rawMiss=LS.get('x-miss',[]);
   const liveExtra=rawMiss.filter(m=>!isExpired(m,WEEK_MS));
@@ -4831,10 +4826,7 @@ function addMiss(){
   const miss={id:'m'+Date.now(),icon:i,title:n,desc:d,region:r,postedAtMs:Date.now(),postedAt:new Date().toLocaleString()};
   extra.push(miss);
   LS.set('x-miss',extra);
-  if (window.FB) {
-    const { addDoc, collection, serverTimestamp, db } = window.FB;
-    addDoc(collection(db, 'missions'), Object.assign({}, miss, { ts: serverTimestamp() })).catch(() => {});
-  }
+  if (GS_CONFIGURED) { _gsPost('addDoc', 'missions', miss).catch(() => {}); }
   ['amn','amr','ami','amd'].forEach(id=>document.getElementById(id).value='');
   toast('Mission report added! ✅');addLog('Mission: '+n);updStats();
   renderMiss();
@@ -5527,15 +5519,14 @@ function renderPublicMedia(){
     return;
   }
   if(lbl)lbl.textContent='Photos & sermons from '+(selectedChurch||'your church');
-  // Fetch from Google Sheets first to get cross-device cloud media
-  if(window.FB&&window.FB.db){
+  // Fetch from Google Sheets to get cross-device cloud media
+  if(GS_CONFIGURED){
     el.innerHTML='<div style="text-align:center;padding:30px;color:var(--text3);font-size:13px">⏳ Loading media...</div>';
-    var _fbDB=window.FB.db;
-    window.FB.getDocs(window.FB.collection(_fbDB,'media')).then(function(snap){
+    _gsGet('getDocs','media').then(function(res){
       var now2=Date.now();
+      var rows=Array.isArray(res)?res:(res&&Array.isArray(res.data)?res.data:[]);
       var existingUrls=new Set(mediaItems.map(function(m){return m.url||m.downloadURL||'';}));
-      snap.forEach(function(d){
-        var m=d.data();
+      rows.forEach(function(m){
         if(m.expiresAt&&m.expiresAt<now2)return;
         var mUrl=m.url||m.downloadURL||'';
         if(!mUrl||existingUrls.has(mUrl))return;
@@ -5798,21 +5789,20 @@ async function loadPersistedMedia(){
       console.log('SDA Portal: auto-deleted '+purgePromises.length+' expired media record(s)');
     }
     // STEP 2: Load cloud media from Google Sheets (Cloudinary URLs) for cross-device access
-    if(window.FB&&window.FB.db){
-      const {getDocs,collection,db}=window.FB;
+    if(GS_CONFIGURED){
       const adminChurchId=currentAdmin&&(currentAdmin.churchId||makeChurchId(currentAdmin.church||''));
-      getDocs(collection(db,'media')).then(function(snap){
+      _gsGet('getDocs','media').then(function(res){
         const now2=Date.now();
+        const rows=Array.isArray(res)?res:(res&&Array.isArray(res.data)?res.data:[]);
         const existingUrls=new Set(mediaItems.map(function(m){return m.url||m.downloadURL||'';}));
-        snap.forEach(function(d){
-          const m=d.data();
+        rows.forEach(function(m){
           if(m.expiresAt&&m.expiresAt<now2)return;
           const mUrl=m.url||m.downloadURL||'';
           if(!mUrl||existingUrls.has(mUrl))return;
           const mChurchId=m.churchId||(m.church?makeChurchId(m.church):null);
           if(adminChurchId&&mChurchId&&mChurchId!==adminChurchId)return;
           existingUrls.add(mUrl);
-          mediaItems.push(Object.assign({},m,{url:mUrl,source:m.source||'cloudinary',_gsId:d.id}));
+          mediaItems.push(Object.assign({},m,{url:mUrl,source:m.source||'cloudinary',_gsId:m.id||m._id}));
         });
         if(currentAdmin)renderAdminMediaPanels();
         updStats();
@@ -5931,10 +5921,9 @@ function addPhotoFromURL(){
   var saved=JSON.parse(localStorage.getItem('sda-media-cloud')||'[]');
   saved.push(item);
   try{localStorage.setItem('sda-media-cloud',JSON.stringify(saved));}catch(e){}
-  // Save to Firestore
-  if(window.FB&&window.FB.db){
-    window.FB.addDoc(window.FB.collection(window.FB.db,'media'),
-      Object.assign({},item,{ts:window.FB.serverTimestamp()})).catch(function(){});
+  // Save to Google Sheets for cross-device sync
+  if(GS_CONFIGURED){
+    _gsPost('addDoc','media', item).catch(function(){});
   }
   // Add to gallery immediately
   var gal=document.getElementById('pgal');
@@ -6106,8 +6095,8 @@ function handlePhotos(inp){
         var saved=JSON.parse(localStorage.getItem('sda-media-cloud')||'[]');
         saved.push(Object.assign({},item,{url:dlURL,downloadURL:dlURL,source:'cloudinary'}));
         try{localStorage.setItem('sda-media-cloud',JSON.stringify(saved));}catch(e){}
-        if(window.FB&&window.FB.db){window.FB.addDoc(window.FB.collection(window.FB.db,'media'),
-          Object.assign({},item,{url:dlURL,downloadURL:dlURL,source:'cloudinary',ts:window.FB.serverTimestamp()})).catch(function(){});}
+        if(GS_CONFIGURED){_gsPost('addDoc','media',
+          Object.assign({},item,{url:dlURL,downloadURL:dlURL,source:'cloudinary'})).catch(function(){});}
         toast('✅ Photo uploaded to cloud!',2000);
       })
       .catch(function(err){
@@ -6184,7 +6173,7 @@ function handleAudio(inp){
   _uploadToStorage(f,sp,function(pct){_mediaShowProgress('audio',pct,'"'+title+'" \u2014 '+pct+'%');})
   .then(function(dlURL){
       var _cka='ck_'+Date.now()+'_'+Math.random().toString(36).slice(2);
-      if(window.FB){window.FB.addDoc(window.FB.collection(window.FB.db,'media'),Object.assign({},rec,{downloadURL:dlURL,storagePath:sp,ts:window.FB.serverTimestamp()})).catch(function(){});}
+      if(GS_CONFIGURED){_gsPost('addDoc','media',Object.assign({},rec,{downloadURL:dlURL,storagePath:sp})).catch(function(){});}
       // Save to localStorage so audio survives reload
     var savedA=JSON.parse(localStorage.getItem('sda-media-cloud')||'[]');
     savedA.push({type:'audio',url:dlURL,title:title,preacher:preacher,size:f.size,church:rec.church,churchId:rec.churchId,dist:rec.dist,postedBy:rec.postedBy,postedAt:rec.postedAt,postedAtMs:rec.postedAtMs,expiresAt:rec.expiresAt,uploadedDate:rec.uploadedDate,source:'cloudinary',_delKey:_cka});
@@ -6230,7 +6219,7 @@ function handleVideo(inp){
   _uploadToStorage(f,sp,function(pct){_mediaShowProgress('video',pct,'"'+title+'" \u2014 '+pct+'%');})
   .then(function(dlURL){
       var _ckv='ck_'+Date.now()+'_'+Math.random().toString(36).slice(2);
-      if(window.FB){window.FB.addDoc(window.FB.collection(window.FB.db,'media'),Object.assign({},rec,{downloadURL:dlURL,storagePath:sp,ts:window.FB.serverTimestamp()})).catch(function(){});}
+      if(GS_CONFIGURED){_gsPost('addDoc','media',Object.assign({},rec,{downloadURL:dlURL,storagePath:sp})).catch(function(){});}
       var savedV=JSON.parse(localStorage.getItem('sda-media-cloud')||'[]');
       savedV.push({type:'video',url:dlURL,title:title,preacher:preacher,size:f.size,church:rec.church,churchId:rec.churchId,dist:rec.dist,postedBy:rec.postedBy,postedAt:rec.postedAt,postedAtMs:rec.postedAtMs,expiresAt:rec.expiresAt,uploadedDate:rec.uploadedDate,source:'cloudinary',_delKey:_ckv});
       try{localStorage.setItem('sda-media-cloud',JSON.stringify(savedV));}catch(e){}
@@ -7194,10 +7183,7 @@ function submitPrayer() {
   document.getElementById('p-req').value  = '';
   toast('🙏 Prayer submitted!');
   renderPrayerList(arr, document.getElementById('pl'));
-  if (window.FB) {
-    const {addDoc, collection, serverTimestamp, db} = window.FB;
-    addDoc(collection(db,'prayers'), Object.assign({}, env, {ts: serverTimestamp()})).catch(()=>{});
-  }
+  if (GS_CONFIGURED) { _gsPost('addDoc', 'prayers', env).catch(() => {}); }
 }
 
 function loadFirestorePrayers(churchId) {
@@ -7208,20 +7194,15 @@ function loadFirestorePrayers(churchId) {
   // Show local cache instantly
   const local = LS.get(localKey, []).filter(p => !p.expiresAt || p.expiresAt > now);
   renderPrayerList(local, pl);
-  // Fetch from Firebase for cross-device sync
-  if (window.FB) {
-    const { getDocs, collection, query, where, db } = window.FB;
-    const timeout = new Promise((_, rej) => setTimeout(() => rej('timeout'), 8000));
-    Promise.race([
-      getDocs(query(collection(db, 'prayers'), where('churchId', '==', churchId))),
-      timeout
-    ]).then(snap => {
-      const regs = [];
-      snap.forEach(d => { const data = d.data(); data._fbId = d.id; regs.push(data); });
+  // Fetch from Google Sheets for cross-device sync
+  if (GS_CONFIGURED) {
+    _gsGet('getDocs', 'prayers').then(res => {
+      const rows = Array.isArray(res) ? res : (res && Array.isArray(res.docs) ? res.docs.map(d => d.data) : []);
+      const filtered = rows.filter(p => p.churchId === churchId);
       const localNow = LS.get(localKey, []);
-      const fbIds = new Set(regs.map(r => r.id));
-      localNow.forEach(r => { if (!fbIds.has(r.id)) regs.push(r); });
-      const live = regs.filter(p => !p.expiresAt || p.expiresAt > Date.now());
+      const gsIds = new Set(filtered.map(r => r.id));
+      localNow.forEach(r => { if (!gsIds.has(r.id)) filtered.push(r); });
+      const live = filtered.filter(p => !p.expiresAt || p.expiresAt > Date.now());
       LS.set(localKey, live);
       renderPrayerList(live, pl);
     }).catch(() => {});
@@ -7931,10 +7912,7 @@ function submitPrayerWall() {
   const nameInp = document.getElementById('pw-name'); if (nameInp) nameInp.value = '';
   toast(type === 'praise' ? '🙌 Praise shared!' : '🙏 Prayer posted!');
   renderPrayerWall(all);
-  if (window.FB) {
-    const {addDoc, collection, serverTimestamp, db} = window.FB;
-    addDoc(collection(db,'prayerwall'), Object.assign({}, env, {ts: serverTimestamp()})).catch(()=>{});
-  }
+  if (GS_CONFIGURED) { _gsPost('addDoc', 'prayerwall', env).catch(() => {}); }
 }
 function loadFirestorePrayerWall(filter) {
   const churchId = getChurchId();
@@ -7944,20 +7922,15 @@ function loadFirestorePrayerWall(filter) {
   const local = LS.get(key, []).filter(p => !p.expiresAt || p.expiresAt > now);
   const _filter = filter;
   renderPrayerWall(_filter && _filter !== 'all' ? local.filter(p => p.type === _filter) : local);
-  // Fetch from Firebase for cross-device sync
-  if (window.FB) {
-    const { getDocs, collection, query, where, db } = window.FB;
-    const timeout = new Promise((_, rej) => setTimeout(() => rej('timeout'), 8000));
-    Promise.race([
-      getDocs(query(collection(db, 'prayerwall'), where('churchId', '==', churchId))),
-      timeout
-    ]).then(snap => {
-      const regs = [];
-      snap.forEach(d => { const data = d.data(); data._fbId = d.id; regs.push(data); });
+  // Fetch from Google Sheets for cross-device sync
+  if (GS_CONFIGURED) {
+    _gsGet('getDocs', 'prayerwall').then(res => {
+      const rows = Array.isArray(res) ? res : (res && Array.isArray(res.docs) ? res.docs.map(d => d.data) : []);
+      const filtered = rows.filter(p => p.churchId === churchId);
       const localNow = LS.get(key, []);
-      const fbIds = new Set(regs.map(r => r.id));
-      localNow.forEach(r => { if (!fbIds.has(r.id)) regs.push(r); });
-      const live = regs.filter(p => !p.expiresAt || p.expiresAt > Date.now());
+      const gsIds = new Set(filtered.map(r => r.id));
+      localNow.forEach(r => { if (!gsIds.has(r.id)) filtered.push(r); });
+      const live = filtered.filter(p => !p.expiresAt || p.expiresAt > Date.now());
       LS.set(key, live);
       renderPrayerWall(_filter && _filter !== 'all' ? live.filter(p => p.type === _filter) : live);
     }).catch(() => {});
@@ -7994,10 +7967,7 @@ function submitTestimony() {
   clearTestFields();
   toast('🙌 Testimony shared! God is good!');
   renderTestimonies(all);
-  if (window.FB) {
-    const {addDoc, collection, serverTimestamp, db} = window.FB;
-    addDoc(collection(db,'testimonies'), Object.assign({}, env, {ts: serverTimestamp()})).catch(()=>{});
-  }
+  if (GS_CONFIGURED) { _gsPost('addDoc', 'testimonies', env).catch(() => {}); }
 }
 function clearTestFields() {
   ['test-name','test-min','test-body'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
@@ -8008,20 +7978,15 @@ function loadFirestoreTestimonies() {
   const key = 'sda-testimonies-' + churchId;
   // Show local cache instantly
   renderTestimonies(LS.get(key, []).filter(t => !t.expiresAt || t.expiresAt > now));
-  // Fetch from Firebase for cross-device sync
-  if (window.FB) {
-    const { getDocs, collection, query, where, db } = window.FB;
-    const timeout = new Promise((_, rej) => setTimeout(() => rej('timeout'), 8000));
-    Promise.race([
-      getDocs(query(collection(db, 'testimonies'), where('churchId', '==', churchId))),
-      timeout
-    ]).then(snap => {
-      const regs = [];
-      snap.forEach(d => { const data = d.data(); data._fbId = d.id; regs.push(data); });
+  // Fetch from Google Sheets for cross-device sync
+  if (GS_CONFIGURED) {
+    _gsGet('getDocs', 'testimonies').then(res => {
+      const rows = Array.isArray(res) ? res : (res && Array.isArray(res.docs) ? res.docs.map(d => d.data) : []);
+      const filtered = rows.filter(t => t.churchId === churchId);
       const localNow = LS.get(key, []);
-      const fbIds = new Set(regs.map(r => r.id));
-      localNow.forEach(r => { if (!fbIds.has(r.id)) regs.push(r); });
-      const live = regs.filter(t => !t.expiresAt || t.expiresAt > Date.now());
+      const gsIds = new Set(filtered.map(r => r.id));
+      localNow.forEach(r => { if (!gsIds.has(r.id)) filtered.push(r); });
+      const live = filtered.filter(t => !t.expiresAt || t.expiresAt > Date.now());
       LS.set(key, live);
       renderTestimonies(live);
     }).catch(() => {});
