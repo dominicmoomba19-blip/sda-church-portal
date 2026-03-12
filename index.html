@@ -3963,10 +3963,9 @@ function submitSubscription() {
   allA.push(req);
   LS.set('sda-admins', allA);
   admins = allA;
-  // Save to Firestore so superadmin sees it across ALL devices
-  // Build the Firebase record once (no password)
+  // Save to Google Sheets so superadmin sees it across ALL devices
+  // Password is kept so cross-device login verification works
   var _fbReq = Object.assign({}, req);
-  delete _fbReq.p;
   _fbReq.ts = Date.now();
 
   function _saveSubToFirebase(attempt) {
