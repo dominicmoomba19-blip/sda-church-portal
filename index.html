@@ -105,6 +105,8 @@
   window.nav._isStub=true;
 })();
 </script>
+<!-- Supabase JS SDK -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <!-- Google Sheets backend (via Google Apps Script web app) -->
 <script>
 // ═══════════════════════════════════════════════════════════════
@@ -5789,22 +5791,82 @@ async function loadPersistedMedia(){
       console.log('SDA Portal: auto-deleted '+purgePromises.length+' expired media record(s)');
     }
     // STEP 2: Load cloud media from Google Sheets (Cloudinary URLs) for cross-device access
-    if(GS_CONFIGURED){
-      const adminChurchId=currentAdmin&&(currentAdmin.churchId||makeChurchId(currentAdmin.church||''));
-      _gsGet('getDocs','media').then(function(res){
-        const now2=Date.now();
-        const rows=Array.isArray(res)?res:(res&&Array.isArray(res.data)?res.data:[]);
-        const existingUrls=new Set(mediaItems.map(function(m){return m.url||m.downloadURL||'';}));
-        rows.forEach(function(m){
-          if(m.expiresAt&&m.expiresAt<now2)return;
-          const mUrl=m.url||m.downloadURL||'';
-          if(!mUrl||existingUrls.has(mUrl))return;
-          const mChurchId=m.churchId||(m.church?makeChurchId(m.church):null);
-          if(adminChurchId&&mChurchId&&mChurchId!==adminChurchId)return;
-          existingUrls.add(mUrl);
-          mediaItems.push(Object.assign({},m,{url:mUrl,source:m.source||'cloudinary',_gsId:m.id||m._id}));
-        });
-        if(currentAdmin)renderAdminMediaPanels();
+    // Falls back to Supabase Media table if Google Sheets is unavailable or returns empty
+    function _mergeCloudRows(rows, source) {
+      var now2 = Date.now();
+      var adminChurchId = currentAdmin && (currentAdmin.churchId || makeChurchId(currentAdmin.church || ''));
+      var existingUrls = new Set(mediaItems.map(function(m){ return m.url || m.downloadURL || ''; }));
+      var added = 0;
+      rows.forEach(function(m) {
+        // Supabase rows use snake_case — normalise to camelCase
+        if (source === 'supabase') {
+          m = {
+            url: m.media_url || m.url || '',
+            downloadURL: m.media_url || m.url || '',
+            type: m.media_type || m.type || 'photo',
+            title: m.title || '',
+            church: m.church || '',
+            churchId: m.church_id || m.churchId || '',
+            dist: m.district || m.dist || '',
+            postedBy: m.posted_by || m.postedBy || '',
+            postedAt: m.posted_at || m.postedAt || '',
+            expiresAt: m.expires_at ? new Date(m.expires_at).getTime() : null,
+            source: 'supabase'
+          };
+        }
+        if (m.expiresAt && m.expiresAt < now2) return;
+        var mUrl = m.url || m.downloadURL || '';
+        if (!mUrl || existingUrls.has(mUrl)) return;
+        var mChurchId = m.churchId || (m.church ? makeChurchId(m.church) : null);
+        if (adminChurchId && mChurchId && mChurchId !== adminChurchId) return;
+        existingUrls.add(mUrl);
+        mediaItems.push(Object.assign({}, m, { url: mUrl, source: m.source || 'cloudinary' }));
+        added++;
+      });
+      return added;
+    }
+
+    if (GS_CONFIGURED) {
+      _gsGet('getDocs', 'media').then(function(res) {
+        var rows = Array.isArray(res) ? res : (res && Array.isArray(res.data) ? res.data : []);
+        var added = _mergeCloudRows(rows, 'sheets');
+        if (currentAdmin) renderAdminMediaPanels();
+        updStats();
+        // If Google Sheets returned nothing AND Supabase is ready, try Supabase as backup read
+        if (added === 0 && SUPABASE_CONFIGURED && supabaseClient) {
+          console.info('[SDA Portal] Google Sheets returned empty media — trying Supabase fallback read');
+          supabaseClient.from('Media').select('*').then(function(r) {
+            if (r.error) { console.warn('[Supabase] Read error:', r.error.message); return; }
+            var sbAdded = _mergeCloudRows(r.data || [], 'supabase');
+            if (sbAdded > 0) {
+              console.info('[SDA Portal] Loaded ' + sbAdded + ' media record(s) from Supabase fallback');
+              if (currentAdmin) renderAdminMediaPanels();
+              updStats();
+            }
+          }).catch(function(e){ console.warn('[Supabase] Fallback read failed:', e); });
+        }
+      }).catch(function() {
+        // Google Sheets fetch itself failed — go straight to Supabase
+        if (SUPABASE_CONFIGURED && supabaseClient) {
+          console.warn('[SDA Portal] Google Sheets unreachable — loading media from Supabase');
+          supabaseClient.from('Media').select('*').then(function(r) {
+            if (r.error || !r.data) return;
+            var sbAdded = _mergeCloudRows(r.data, 'supabase');
+            if (sbAdded > 0) {
+              if (currentAdmin) renderAdminMediaPanels();
+              updStats();
+              toast('⚡ Loaded from Supabase backup', 3000);
+            }
+          }).catch(function(){});
+        }
+      });
+    } else if (SUPABASE_CONFIGURED && supabaseClient) {
+      // Google Sheets not configured at all — use Supabase as primary read source
+      console.info('[SDA Portal] No Google Sheets config — reading media from Supabase');
+      supabaseClient.from('Media').select('*').then(function(r) {
+        if (r.error || !r.data) return;
+        _mergeCloudRows(r.data, 'supabase');
+        if (currentAdmin) renderAdminMediaPanels();
         updStats();
       }).catch(function(){});
     }
@@ -5847,8 +5909,9 @@ function refreshMediaStorageBadge(){
   var el=document.getElementById('media-storage-badge');if(!el)return;
   // Show Google Sheets connection status
   if(window.CLOUDINARY_CLOUD){
+    var _sbLabel=SUPABASE_CONFIGURED?'<br><span style="opacity:.75">⚡ Supabase fallback ready — auto-retries if Cloudinary fails</span>':'';
     el.style.cssText='font-size:11px;color:var(--em3);background:rgba(26,122,80,.08);border:1px solid rgba(26,122,80,.2);border-radius:8px;padding:8px 12px;margin-bottom:12px;line-height:1.6';
-    el.innerHTML='☁️ <strong>Cloudinary</strong> — media saved to cloud. Works on any device.';
+    el.innerHTML='☁️ <strong>Cloudinary</strong> — media saved to cloud. Works on any device.'+_sbLabel;
     return;
   }
   if(window.FB_CONFIGURED&&window.FB&&window.FB.storage){
@@ -5874,6 +5937,92 @@ var CLOUDINARY_PRESET = 'church_upload';
 var CLOUDINARY_URL    = 'https://api.cloudinary.com/v1_1/' + CLOUDINARY_CLOUD + '/auto/upload';
 window.CLOUDINARY_CLOUD = CLOUDINARY_CLOUD;
 
+// ── SUPABASE STORAGE (fallback when Cloudinary fails) ────────────
+var SUPABASE_URL      = 'https://mhrmxisshcexdotysfvc.supabase.co';
+var SUPABASE_ANON_KEY = 'sb_publishable_WeeRPWmIVVKpbzxHOudOtQ__IaRpwn9';
+var SUPABASE_BUCKET   = 'media';
+var SUPABASE_CONFIGURED = false;
+var supabaseClient    = null;
+
+// Initialise the official Supabase JS client once the SDK loads
+(function _initSupabase() {
+  try {
+    if (typeof window.supabase !== 'undefined' && typeof window.supabase.createClient === 'function') {
+      supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      SUPABASE_CONFIGURED = true;
+      console.info('[Supabase] Client initialised ✅');
+    } else {
+      // SDK not yet loaded — retry after DOM is ready
+      window.addEventListener('load', function() {
+        if (typeof window.supabase !== 'undefined') {
+          supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+          SUPABASE_CONFIGURED = true;
+          console.info('[Supabase] Client initialised on load ✅');
+        } else {
+          console.warn('[Supabase] SDK not available — fallback disabled');
+        }
+      });
+    }
+  } catch(e) { console.warn('[Supabase] Init error:', e); }
+})();
+
+// Upload file via official SDK + XHR progress simulation
+function _supabaseUpload(file, path, onProgress) {
+  if (!SUPABASE_CONFIGURED || !supabaseClient) {
+    return Promise.reject(new Error('Supabase not configured'));
+  }
+  var fileName = (path || ('uploads/' + Date.now() + '-' + file.name.replace(/[^a-zA-Z0-9._-]/g, '-')));
+
+  // Simulate progress (SDK v2 does not expose XHR progress)
+  var _pct = 0;
+  var _pTimer = null;
+  if (onProgress) {
+    _pTimer = setInterval(function() {
+      _pct = Math.min(_pct + 8, 90);
+      onProgress(_pct);
+    }, 300);
+  }
+
+  return supabaseClient.storage
+    .from(SUPABASE_BUCKET)
+    .upload(fileName, file, { upsert: true, contentType: file.type || 'application/octet-stream' })
+    .then(function(result) {
+      if (_pTimer) clearInterval(_pTimer);
+      if (onProgress) onProgress(100);
+      if (result.error) throw new Error(result.error.message || 'Supabase upload failed');
+      var urlResult = supabaseClient.storage.from(SUPABASE_BUCKET).getPublicUrl(fileName);
+      var publicUrl = urlResult.data && urlResult.data.publicUrl;
+      if (!publicUrl) throw new Error('Could not get public URL from Supabase');
+      return publicUrl;
+    })
+    .catch(function(err) {
+      if (_pTimer) clearInterval(_pTimer);
+      throw err;
+    });
+}
+
+// Save metadata row to Supabase Media table (mirrors Google Sheets)
+function _supabaseSaveMeta(record) {
+  if (!SUPABASE_CONFIGURED || !supabaseClient) return Promise.resolve();
+  var row = {
+    title:       record.title || record.name || '',
+    media_url:   record.url   || record.downloadURL || '',
+    media_type:  record.type  || 'photo',
+    church:      record.church      || '',
+    church_id:   record.churchId    || '',
+    district:    record.dist        || '',
+    posted_by:   record.postedBy    || '',
+    posted_at:   record.postedAt    || new Date().toISOString(),
+    source:      record.source      || 'cloudinary',
+    expires_at:  record.expiresAt   ? new Date(record.expiresAt).toISOString() : null
+  };
+  return supabaseClient.from('Media').insert([row])
+    .then(function(r) {
+      if (r.error) console.warn('[Supabase] Meta save error:', r.error.message);
+    })
+    .catch(function(e) { console.warn('[Supabase] Meta save failed:', e); });
+}
+
 function _cloudinaryUpload(file, onProgress) {
   return new Promise(function(resolve, reject) {
     var fd = new FormData();
@@ -5897,9 +6046,16 @@ function _cloudinaryUpload(file, onProgress) {
     xhr.send(fd);
   });
 }
-function _uploadToStorage(file, path, onProgress){
-  // path arg kept for compatibility but Cloudinary manages its own paths
-  return _cloudinaryUpload(file, onProgress);
+
+// ── UPLOAD CASCADE: Cloudinary → Supabase → (caller handles local fallback) ──
+function _uploadToStorage(file, path, onProgress) {
+  return _cloudinaryUpload(file, onProgress)
+    .catch(function(cloudErr) {
+      if (!SUPABASE_CONFIGURED) return Promise.reject(cloudErr);
+      console.warn('Cloudinary failed, trying Supabase...', cloudErr.message);
+      toast('☁️ Retrying upload via backup storage…', 2500);
+      return _supabaseUpload(file, path, onProgress);
+    });
 }
 var ALLOWED_IMAGE=['image/jpeg','image/png','image/webp','image/gif'];
 var ALLOWED_AUDIO=['audio/mpeg','audio/wav','audio/mp4','audio/ogg','audio/x-m4a','audio/aac'];
@@ -5955,48 +6111,61 @@ function testCloudinary(){
     .catch(function(e){ toast('❌ Network error: '+e.message,6000); });
 }
 window.testCloudinary=testCloudinary;
+
+function testSupabase(){
+  if(!SUPABASE_CONFIGURED){toast('⚠️ Supabase not configured — add your URL and key.',5000);return;}
+  toast('Testing Supabase connection…',2000);
+  // Upload a 1-pixel PNG as a connection test
+  var byteStr=atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==');
+  var ab=new ArrayBuffer(byteStr.length); var ia=new Uint8Array(ab);
+  for(var i=0;i<byteStr.length;i++) ia[i]=byteStr.charCodeAt(i);
+  var testFile=new File([ab],'test-ping.png',{type:'image/png'});
+  _supabaseUpload(testFile,'_ping/test-'+Date.now()+'.png',null)
+    .then(function(url){
+      toast('✅ Supabase connected! Fallback uploads will work.',4000);
+      console.log('Supabase test URL:',url);
+    })
+    .catch(function(e){ toast('❌ Supabase error: '+(e.message||'check URL / key / bucket'),7000); });
+}
+window.testSupabase=testSupabase;
+
 function uploadToCloudinary(inp) {
   var files = Array.from(inp.files).slice(0, 10);
   if (!files.length) return;
   toast('Uploading ' + files.length + ' photo(s)...', 3000);
   var uploaded = 0;
   files.forEach(function(file) {
-    var fd = new FormData();
-    fd.append('file', file);
-    fd.append('upload_preset', CLOUDINARY_PRESET);
-    fetch('https://api.cloudinary.com/v1_1/' + CLOUDINARY_CLOUD + '/image/upload', {
-      method: 'POST',
-      body: fd
-    })
-    .then(function(res) { return res.json(); })
-    .then(function(data) {
-      if (data.secure_url) {
-        var _ch = currentAdmin && currentAdmin.church || '';
-        var _cid = currentAdmin && currentAdmin.churchId || (typeof makeChurchId === 'function' ? makeChurchId(_ch) : _ch);
-        var item = {
-          _delKey: 'cl-' + Date.now() + '-' + Math.random().toString(36).slice(2),
-          type: 'photo', source: 'cloudinary',
-          url: data.secure_url, name: file.name,
-          church: _ch, churchId: _cid,
-          postedBy: currentAdmin && currentAdmin.n || 'Admin',
-          postedAt: new Date().toISOString(),
-          expiresAt: Date.now() + DAY2_MS
-        };
-        mediaItems.push(item);
-        // Save to localStorage
-        var saved = JSON.parse(localStorage.getItem('sda-media-cloud') || '[]');
-        saved.push(item);
-        localStorage.setItem('sda-media-cloud', JSON.stringify(saved));
-        uploaded++;
-        if (uploaded === files.length) {
-          toast('✅ ' + uploaded + ' photo(s) uploaded!', 3000);
-          if (typeof renderAdminMediaPanels === 'function') renderAdminMediaPanels();
-        }
-      } else {
-        toast('❌ Upload failed: ' + (data.error && data.error.message || 'Unknown error'), 5000);
+    // Use cascade: Cloudinary → Supabase fallback
+    _uploadToStorage(file, 'photos/' + Date.now() + '-' + file.name.replace(/[^a-zA-Z0-9._-]/g,'-'), null)
+    .then(function(secureUrl) {
+      var _ch  = currentAdmin && currentAdmin.church || '';
+      var _cid = currentAdmin && currentAdmin.churchId || (typeof makeChurchId === 'function' ? makeChurchId(_ch) : _ch);
+      var _src = secureUrl.indexOf('supabase') !== -1 ? 'supabase' : 'cloudinary';
+      var item = {
+        _delKey: 'cl-' + Date.now() + '-' + Math.random().toString(36).slice(2),
+        type: 'photo', source: _src,
+        url: secureUrl, downloadURL: secureUrl, name: file.name,
+        church: _ch, churchId: _cid,
+        postedBy: currentAdmin && currentAdmin.n || 'Admin',
+        postedAt: new Date().toISOString(),
+        expiresAt: Date.now() + DAY2_MS
+      };
+      mediaItems.push(item);
+      // ✅ Save to localStorage (this device)
+      var saved = JSON.parse(localStorage.getItem('sda-media-cloud') || '[]');
+      saved.push(item);
+      localStorage.setItem('sda-media-cloud', JSON.stringify(saved));
+      // ✅ Save to Google Sheets (cross-device sync)
+      if (GS_CONFIGURED) { _gsPost('addDoc', 'media', item).catch(function(){}); }
+      // ✅ Save to Supabase Media table (backup DB)
+      _supabaseSaveMeta(item);
+      uploaded++;
+      if (uploaded === files.length) {
+        toast('✅ ' + uploaded + ' photo(s) uploaded!', 3000);
+        if (typeof renderAdminMediaPanels === 'function') renderAdminMediaPanels();
       }
     })
-    .catch(function(e) { toast('❌ ' + e.message, 5000); });
+    .catch(function(e) { toast('❌ ' + (e.message || 'Upload failed'), 5000); });
   });
   inp.value = '';
 }
@@ -6086,18 +6255,20 @@ function handlePhotos(inp){
     }
     // Upload to Cloudinary in background — real progress via XHR
     function onPct(pct){_mediaShowProgress('photo',pct,'Uploading '+(done)+' of '+total+' ('+pct+'%)');}
-    _cloudinaryUpload(f, onPct)
+    _uploadToStorage(f, 'photos/'+Date.now()+'-'+f.name.replace(/[^a-zA-Z0-9._-]/g,'-'), onPct)
       .then(function(dlURL){
-        item.url=dlURL; item.downloadURL=dlURL; item.source='cloudinary';
+        var uploadSrc = dlURL.indexOf('supabase') !== -1 ? 'supabase' : 'cloudinary';
+        item.url=dlURL; item.downloadURL=dlURL; item.source=uploadSrc;
         var gal2=document.getElementById('pgal');
-        if(gal2){var oi=gal2.querySelector('[data-url="'+blobUrl+'"]');
-          if(oi){oi.setAttribute('data-url',dlURL);oi.src=dlURL;oi.onclick=function(){openLB(dlURL);};}}
+        if(gal2){var oi=gal2.querySelector('[data-url="'+blobUrl+'"');
+          if(oi){oi.setAttribute('data-url',dlURL);oi.src=dlURL;oi.onclick=function(){openLB(dlURL);}}}
         var saved=JSON.parse(localStorage.getItem('sda-media-cloud')||'[]');
-        saved.push(Object.assign({},item,{url:dlURL,downloadURL:dlURL,source:'cloudinary'}));
+        saved.push(Object.assign({},item,{url:dlURL,downloadURL:dlURL,source:uploadSrc}));
         try{localStorage.setItem('sda-media-cloud',JSON.stringify(saved));}catch(e){}
-        if(GS_CONFIGURED){_gsPost('addDoc','media',
-          Object.assign({},item,{url:dlURL,downloadURL:dlURL,source:'cloudinary'})).catch(function(){});}
-        toast('✅ Photo uploaded to cloud!',2000);
+        var _metaP=Object.assign({},item,{url:dlURL,downloadURL:dlURL,source:uploadSrc});
+        if(GS_CONFIGURED){_gsPost('addDoc','media',_metaP).catch(function(){});}
+        _supabaseSaveMeta(_metaP);
+        toast('✅ Photo uploaded'+(uploadSrc==='supabase'?' via Supabase ☁️':'')+'!',2000);
       })
       .catch(function(err){
         toast('❌ Upload failed: '+(err&&err.message||'check internet'), 5000);
@@ -6176,9 +6347,12 @@ function handleAudio(inp){
       if(GS_CONFIGURED){_gsPost('addDoc','media',Object.assign({},rec,{downloadURL:dlURL,storagePath:sp})).catch(function(){});}
       // Save to localStorage so audio survives reload
     var savedA=JSON.parse(localStorage.getItem('sda-media-cloud')||'[]');
-    savedA.push({type:'audio',url:dlURL,title:title,preacher:preacher,size:f.size,church:rec.church,churchId:rec.churchId,dist:rec.dist,postedBy:rec.postedBy,postedAt:rec.postedAt,postedAtMs:rec.postedAtMs,expiresAt:rec.expiresAt,uploadedDate:rec.uploadedDate,source:'cloudinary',_delKey:_cka});
+    var _audioSrc = dlURL.indexOf('supabase') !== -1 ? 'supabase' : 'cloudinary';
+    var _audioMeta={type:'audio',url:dlURL,title:title,preacher:preacher,size:f.size,church:rec.church,churchId:rec.churchId,dist:rec.dist,postedBy:rec.postedBy,postedAt:rec.postedAt,postedAtMs:rec.postedAtMs,expiresAt:rec.expiresAt,uploadedDate:rec.uploadedDate,source:_audioSrc,_delKey:_cka};
+    savedA.push(_audioMeta);
     try{localStorage.setItem('sda-media-cloud',JSON.stringify(savedA));}catch(e){}
-    onSuccess(dlURL,'cloudinary');
+    _supabaseSaveMeta(_audioMeta);
+    onSuccess(dlURL,_audioSrc);
     })
     .catch(function(){
       f.arrayBuffer().then(function(buf){
@@ -6221,9 +6395,12 @@ function handleVideo(inp){
       var _ckv='ck_'+Date.now()+'_'+Math.random().toString(36).slice(2);
       if(GS_CONFIGURED){_gsPost('addDoc','media',Object.assign({},rec,{downloadURL:dlURL,storagePath:sp})).catch(function(){});}
       var savedV=JSON.parse(localStorage.getItem('sda-media-cloud')||'[]');
-      savedV.push({type:'video',url:dlURL,title:title,preacher:preacher,size:f.size,church:rec.church,churchId:rec.churchId,dist:rec.dist,postedBy:rec.postedBy,postedAt:rec.postedAt,postedAtMs:rec.postedAtMs,expiresAt:rec.expiresAt,uploadedDate:rec.uploadedDate,source:'cloudinary',_delKey:_ckv});
+      var _videoSrc = dlURL.indexOf('supabase') !== -1 ? 'supabase' : 'cloudinary';
+      var _videoMeta={type:'video',url:dlURL,title:title,preacher:preacher,size:f.size,church:rec.church,churchId:rec.churchId,dist:rec.dist,postedBy:rec.postedBy,postedAt:rec.postedAt,postedAtMs:rec.postedAtMs,expiresAt:rec.expiresAt,uploadedDate:rec.uploadedDate,source:_videoSrc,_delKey:_ckv};
+      savedV.push(_videoMeta);
       try{localStorage.setItem('sda-media-cloud',JSON.stringify(savedV));}catch(e){}
-      onSuccess(dlURL,'cloudinary');
+      _supabaseSaveMeta(_videoMeta);
+      onSuccess(dlURL,_videoSrc);
     })
     .catch(function(){
       f.arrayBuffer().then(function(buf){
@@ -6587,7 +6764,7 @@ self.addEventListener('fetch',ev=>{
 
   // ── Expose HTML-event-handler functions to window (required for onclick= attributes)
   // ── All other app state remains private inside this IIFE scope.
-  window._dFilterChurches=_dFilterChurches;window._dFilterDists=_dFilterDists;window._dRenderLib=_dRenderLib;window._dRenderRec=_dRenderRec;window._dRenderStories=_dRenderStories;window._dSearchHealth=_dSearchHealth;window.addAct=addAct;window.addMiss=addMiss;window.adminGoLive=adminGoLive;window.calNext=calNext;window.calPrev=calPrev;window.chH=chH;window.closeLB=closeLB;window.closeStory=closeStory;window.delAct=delAct;window.dismissPWA=dismissPWA;window.doLogin=doLogin;window.doLogout=doLogout;window.doRegister=doRegister;window.downloadLog=downloadLog;window.endStream=endStream;window.restoreActiveStream=restoreActiveStream;window.goBack1=goBack1;window.goBack2=goBack2;window.handleActPhoto=handleActPhoto;window.handleAudio=handleAudio;window.handlePhotos=handlePhotos;window.handleVideo=handleVideo;window.hidePicker=hidePicker;window.installPWA=installPWA;window.nav=nav;window.addPhotosLocal=addPhotosLocal;window.testCloudinary=testCloudinary;window.addPhotoFromURL=addPhotoFromURL;window.nav._isStub=false;window.openStory=openStory;window.pickConf=pickConf;window.pickManualChurch=pickManualChurch;window.pinMsg=pinMsg;window.quickLaunch=quickLaunch;window.regConfChange=regConfChange;window.regDistChange=regDistChange;window.rndH=rndH;window.sendAnn=sendAnn;window.sendChat=sendChat;window.setActsFilter=setActsFilter;window.setHCat=setHCat;window.setLibF=setLibF;window.setMode=setMode;window.setRecF=setRecF;window.setStF=setStF;window.shareAct=shareAct;window.showPicker=showPicker;window.showRegManual=showRegManual;window.submitPrayer=submitPrayer;window.submitReq=submitReq;window.swSec=swSec;window.swTab=swTab;window.togRec=togRec;window.toggleCalView=toggleCalView;window.toggleListView=toggleListView;window.toggleTheme=toggleTheme;window.memRegConfChange=memRegConfChange;window.memRegDistChange=memRegDistChange;window.memCCConfChange=memCCConfChange;window.memCCDistChange=memCCDistChange;window.memSaveChurch=memSaveChurch;window.toggleMin=toggleMin;window.submitSubscription=submitSubscription;window.subConfChange=subConfChange;window.subDistChange=subDistChange;window.renderSubRequests=renderSubRequests;window.approveSubRequest=approveSubRequest;window.rejectSubRequest=rejectSubRequest;window.renderSubBadge=renderSubBadge;
+  window._dFilterChurches=_dFilterChurches;window._dFilterDists=_dFilterDists;window._dRenderLib=_dRenderLib;window._dRenderRec=_dRenderRec;window._dRenderStories=_dRenderStories;window._dSearchHealth=_dSearchHealth;window.addAct=addAct;window.addMiss=addMiss;window.adminGoLive=adminGoLive;window.calNext=calNext;window.calPrev=calPrev;window.chH=chH;window.closeLB=closeLB;window.closeStory=closeStory;window.delAct=delAct;window.dismissPWA=dismissPWA;window.doLogin=doLogin;window.doLogout=doLogout;window.doRegister=doRegister;window.downloadLog=downloadLog;window.endStream=endStream;window.restoreActiveStream=restoreActiveStream;window.goBack1=goBack1;window.goBack2=goBack2;window.handleActPhoto=handleActPhoto;window.handleAudio=handleAudio;window.handlePhotos=handlePhotos;window.handleVideo=handleVideo;window.hidePicker=hidePicker;window.installPWA=installPWA;window.nav=nav;window.addPhotosLocal=addPhotosLocal;window.testCloudinary=testCloudinary;window.testSupabase=testSupabase;window.addPhotoFromURL=addPhotoFromURL;window.nav._isStub=false;window.openStory=openStory;window.pickConf=pickConf;window.pickManualChurch=pickManualChurch;window.pinMsg=pinMsg;window.quickLaunch=quickLaunch;window.regConfChange=regConfChange;window.regDistChange=regDistChange;window.rndH=rndH;window.sendAnn=sendAnn;window.sendChat=sendChat;window.setActsFilter=setActsFilter;window.setHCat=setHCat;window.setLibF=setLibF;window.setMode=setMode;window.setRecF=setRecF;window.setStF=setStF;window.shareAct=shareAct;window.showPicker=showPicker;window.showRegManual=showRegManual;window.submitPrayer=submitPrayer;window.submitReq=submitReq;window.swSec=swSec;window.swTab=swTab;window.togRec=togRec;window.toggleCalView=toggleCalView;window.toggleListView=toggleListView;window.toggleTheme=toggleTheme;window.memRegConfChange=memRegConfChange;window.memRegDistChange=memRegDistChange;window.memCCConfChange=memCCConfChange;window.memCCDistChange=memCCDistChange;window.memSaveChurch=memSaveChurch;window.toggleMin=toggleMin;window.submitSubscription=submitSubscription;window.subConfChange=subConfChange;window.subDistChange=subDistChange;window.renderSubRequests=renderSubRequests;window.approveSubRequest=approveSubRequest;window.rejectSubRequest=rejectSubRequest;window.renderSubBadge=renderSubBadge;
 window.minTab=minTab;
 /* ── IIFE internals needed by v5 member system ── */
 window._LS=LS;window._toast=toast;window._setErr=setErr;window._addLog=addLog;
