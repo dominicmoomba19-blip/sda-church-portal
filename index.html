@@ -5521,22 +5521,57 @@ function renderPublicMedia(){
     return;
   }
   if(lbl)lbl.textContent='Photos & sermons from '+(selectedChurch||'your church');
-  // Fetch from Google Sheets to get cross-device cloud media
+  // Fetch from Google Sheets for cross-device media, fall back to Supabase
   if(GS_CONFIGURED){
     el.innerHTML='<div style="text-align:center;padding:30px;color:var(--text3);font-size:13px">⏳ Loading media...</div>';
     _gsGet('getDocs','media').then(function(res){
+      // GS returns {ok:true, docs:[{id, data:{...}, ts}]} — extract the data objects
+      var rawDocs=(res&&Array.isArray(res.docs))?res.docs:[];
+      var rows=rawDocs.map(function(d){ return Object.assign({},d.data||d,{_gsId:d.id}); });
       var now2=Date.now();
-      var rows=Array.isArray(res)?res:(res&&Array.isArray(res.data)?res.data:[]);
-      var existingUrls=new Set(mediaItems.map(function(m){return m.url||m.downloadURL||'';}));
+      var existingUrls=new Set(mediaItems.map(function(m){return m.downloadURL||m.url||'';}));
       rows.forEach(function(m){
         if(m.expiresAt&&m.expiresAt<now2)return;
-        var mUrl=m.url||m.downloadURL||'';
+        var mUrl=m.downloadURL||m.url||'';
         if(!mUrl||existingUrls.has(mUrl))return;
         existingUrls.add(mUrl);
         mediaItems.push(Object.assign({},m,{url:mUrl,source:m.source||'cloudinary'}));
       });
       _renderPublicMediaContent();
-    }).catch(function(){ _renderPublicMediaContent(); });
+      // If GS returned nothing, try Supabase as fallback
+      if(rows.length===0&&SUPABASE_CONFIGURED&&supabaseClient){
+        supabaseClient.from('Media').select('*').then(function(r){
+          if(r.error||!r.data||!r.data.length)return;
+          var sbUrls=new Set(mediaItems.map(function(m){return m.downloadURL||m.url||'';}));
+          r.data.forEach(function(m){
+            var mUrl=m.media_url||''; if(!mUrl||sbUrls.has(mUrl))return;
+            sbUrls.add(mUrl);
+            mediaItems.push({url:mUrl,downloadURL:mUrl,type:m.media_type||'photo',
+              title:m.title||'',church:m.church||'',churchId:m.church_id||'',
+              dist:m.district||'',postedBy:m.posted_by||'',postedAt:m.posted_at||'',
+              expiresAt:m.expires_at?new Date(m.expires_at).getTime():null,source:'supabase'});
+          });
+          _renderPublicMediaContent();
+        }).catch(function(){});
+      }
+    }).catch(function(){
+      // GS failed entirely — go straight to Supabase
+      if(SUPABASE_CONFIGURED&&supabaseClient){
+        supabaseClient.from('Media').select('*').then(function(r){
+          if(r.error||!r.data)return;
+          var sbUrls=new Set(mediaItems.map(function(m){return m.downloadURL||m.url||'';}));
+          r.data.forEach(function(m){
+            var mUrl=m.media_url||''; if(!mUrl||sbUrls.has(mUrl))return;
+            sbUrls.add(mUrl);
+            mediaItems.push({url:mUrl,downloadURL:mUrl,type:m.media_type||'photo',
+              title:m.title||'',church:m.church||'',churchId:m.church_id||'',
+              dist:m.district||'',postedBy:m.posted_by||'',postedAt:m.posted_at||'',
+              expiresAt:m.expires_at?new Date(m.expires_at).getTime():null,source:'supabase'});
+          });
+          _renderPublicMediaContent();
+        }).catch(function(){_renderPublicMediaContent();});
+      } else { _renderPublicMediaContent(); }
+    });
     return;
   }
   _renderPublicMediaContent();
@@ -5795,7 +5830,7 @@ async function loadPersistedMedia(){
     function _mergeCloudRows(rows, source) {
       var now2 = Date.now();
       var adminChurchId = currentAdmin && (currentAdmin.churchId || makeChurchId(currentAdmin.church || ''));
-      var existingUrls = new Set(mediaItems.map(function(m){ return m.url || m.downloadURL || ''; }));
+      var existingUrls = new Set(mediaItems.map(function(m){ return m.downloadURL || m.url || ''; }));
       var added = 0;
       rows.forEach(function(m) {
         // Supabase rows use snake_case — normalise to camelCase
@@ -5815,7 +5850,7 @@ async function loadPersistedMedia(){
           };
         }
         if (m.expiresAt && m.expiresAt < now2) return;
-        var mUrl = m.url || m.downloadURL || '';
+        var mUrl = m.downloadURL || m.url || '';
         if (!mUrl || existingUrls.has(mUrl)) return;
         var mChurchId = m.churchId || (m.church ? makeChurchId(m.church) : null);
         if (adminChurchId && mChurchId && mChurchId !== adminChurchId) return;
@@ -5828,7 +5863,9 @@ async function loadPersistedMedia(){
 
     if (GS_CONFIGURED) {
       _gsGet('getDocs', 'media').then(function(res) {
-        var rows = Array.isArray(res) ? res : (res && Array.isArray(res.data) ? res.data : []);
+        // GS returns {ok:true, docs:[{id, data:{...}, ts}]} — extract the data objects
+        var rawDocs = (res && Array.isArray(res.docs)) ? res.docs : [];
+        var rows = rawDocs.map(function(d){ return Object.assign({}, d.data || d, {_gsId: d.id}); });
         var added = _mergeCloudRows(rows, 'sheets');
         if (currentAdmin) renderAdminMediaPanels();
         updStats();
@@ -7415,9 +7452,16 @@ function submitReq() {
   document.getElementById('r-msg').value  = '';
   toast('📝 Request submitted!');
   renderReqList(arr, document.getElementById('rl'));
-  if (window.FB) {
-    const {addDoc, collection, serverTimestamp, db} = window.FB;
-    addDoc(collection(db,'requests'), Object.assign({}, env, {ts: serverTimestamp()})).catch(()=>{});
+  // Save to Google Sheets for cross-device sync
+  if (GS_CONFIGURED) { _gsPost('addDoc', 'requests', env).catch(function(){}); }
+  // Save to Supabase backup
+  if (SUPABASE_CONFIGURED && supabaseClient) {
+    supabaseClient.from('requests').insert([{
+      id: env.id, msg: env.msg, type: env.type,
+      name: env.name, church_id: env.churchId, church: env.church||'',
+      posted_by: env.postedBy, posted_at: env.postedAt,
+      expires_at: env.expiresAt ? new Date(env.expiresAt).toISOString() : null
+    }]).catch(function(){});
   }
 }
 function renderReqList(items, el) {
@@ -7743,23 +7787,29 @@ function nav(p) {
     // Show local cache instantly
     const arr = LS.get(key, []).filter(r => !r.expiresAt || r.expiresAt > now);
     if (typeof renderReqList === 'function') renderReqList(arr, document.getElementById('rl'));
-    // Fetch from Firebase for cross-device sync
-    if (window.FB) {
-      const { getDocs, collection, query, where, db } = window.FB;
-      const timeout = new Promise((_, rej) => setTimeout(() => rej('timeout'), 8000));
-      Promise.race([
-        getDocs(query(collection(db, 'requests'), where('churchId', '==', churchId))),
-        timeout
-      ]).then(snap => {
-        const regs = [];
-        snap.forEach(d => { const data = d.data(); data._fbId = d.id; regs.push(data); });
-        const localNow = LS.get(key, []);
-        const fbIds = new Set(regs.map(r => r.id));
-        localNow.forEach(r => { if (!fbIds.has(r.id)) regs.push(r); });
-        const live = regs.filter(r => !r.expiresAt || r.expiresAt > Date.now());
+    // Fetch from Google Sheets for cross-device sync
+    if (GS_CONFIGURED) {
+      _gsGet('getDocs', 'requests', {filters: JSON.stringify({churchId: churchId})}).then(function(res) {
+        var rawDocs = (res && Array.isArray(res.docs)) ? res.docs : [];
+        var gsRows = rawDocs.map(function(d){ return Object.assign({}, d.data || d, {_gsId: d.id}); });
+        var localNow = LS.get(key, []);
+        var gsIds = new Set(gsRows.map(function(r){ return r.id; }));
+        localNow.forEach(function(r){ if (!gsIds.has(r.id)) gsRows.push(r); });
+        var live = gsRows.filter(function(r){ return !r.expiresAt || r.expiresAt > Date.now(); });
         LS.set(key, live);
         if (typeof renderReqList === 'function') renderReqList(live, document.getElementById('rl'));
-      }).catch(() => {});
+      }).catch(function() {
+        // GS failed — try Supabase if configured
+        if (SUPABASE_CONFIGURED && supabaseClient) {
+          supabaseClient.from('requests').select('*')
+            .eq('church_id', churchId)
+            .then(function(r) {
+              if (r.error || !r.data) return;
+              var live = r.data.filter(function(req){ return !req.expires_at || new Date(req.expires_at) > new Date(); });
+              if (live.length && typeof renderReqList === 'function') renderReqList(live, document.getElementById('rl'));
+            }).catch(function(){});
+        }
+      });
     }
   }
   if (p === 'sermons') {
@@ -8101,16 +8151,16 @@ function loadFirestorePrayerWall(filter) {
   renderPrayerWall(_filter && _filter !== 'all' ? local.filter(p => p.type === _filter) : local);
   // Fetch from Google Sheets for cross-device sync
   if (GS_CONFIGURED) {
-    _gsGet('getDocs', 'prayerwall').then(res => {
-      const rows = Array.isArray(res) ? res : (res && Array.isArray(res.docs) ? res.docs.map(d => d.data) : []);
-      const filtered = rows.filter(p => p.churchId === churchId);
-      const localNow = LS.get(key, []);
-      const gsIds = new Set(filtered.map(r => r.id));
-      localNow.forEach(r => { if (!gsIds.has(r.id)) filtered.push(r); });
-      const live = filtered.filter(p => !p.expiresAt || p.expiresAt > Date.now());
+    _gsGet('getDocs', 'prayerwall', {filters: JSON.stringify({churchId: churchId})}).then(function(res) {
+      var rawDocs = (res && Array.isArray(res.docs)) ? res.docs : [];
+      var gsRows = rawDocs.map(function(d){ return Object.assign({}, d.data || d, {_gsId: d.id}); });
+      var localNow = LS.get(key, []);
+      var gsIds = new Set(gsRows.map(function(r){ return r.id; }));
+      localNow.forEach(function(r){ if (!gsIds.has(r.id)) gsRows.push(r); });
+      var live = gsRows.filter(function(p){ return !p.expiresAt || p.expiresAt > Date.now(); });
       LS.set(key, live);
-      renderPrayerWall(_filter && _filter !== 'all' ? live.filter(p => p.type === _filter) : live);
-    }).catch(() => {});
+      renderPrayerWall(_filter && _filter !== 'all' ? live.filter(function(p){ return p.type === _filter; }) : live);
+    }).catch(function() {});
   }
 }
 function renderPrayerWall(posts) {
@@ -8157,16 +8207,28 @@ function loadFirestoreTestimonies() {
   renderTestimonies(LS.get(key, []).filter(t => !t.expiresAt || t.expiresAt > now));
   // Fetch from Google Sheets for cross-device sync
   if (GS_CONFIGURED) {
-    _gsGet('getDocs', 'testimonies').then(res => {
-      const rows = Array.isArray(res) ? res : (res && Array.isArray(res.docs) ? res.docs.map(d => d.data) : []);
-      const filtered = rows.filter(t => t.churchId === churchId);
-      const localNow = LS.get(key, []);
-      const gsIds = new Set(filtered.map(r => r.id));
-      localNow.forEach(r => { if (!gsIds.has(r.id)) filtered.push(r); });
-      const live = filtered.filter(t => !t.expiresAt || t.expiresAt > Date.now());
+    _gsGet('getDocs', 'testimonies', {filters: JSON.stringify({churchId: churchId})}).then(function(res) {
+      // GS returns {ok:true, docs:[{id, data:{...}, ts}]}
+      var rawDocs = (res && Array.isArray(res.docs)) ? res.docs : [];
+      var gsRows = rawDocs.map(function(d){ return Object.assign({}, d.data || d, {_gsId: d.id}); });
+      var localNow = LS.get(key, []);
+      var gsIds = new Set(gsRows.map(function(r){ return r.id; }));
+      localNow.forEach(function(r){ if (!gsIds.has(r.id)) gsRows.push(r); });
+      var live = gsRows.filter(function(t){ return !t.expiresAt || t.expiresAt > Date.now(); });
       LS.set(key, live);
       renderTestimonies(live);
-    }).catch(() => {});
+    }).catch(function() {
+      // GS failed — try Supabase
+      if (SUPABASE_CONFIGURED && supabaseClient) {
+        supabaseClient.from('testimonies').select('*')
+          .eq('church_id', churchId)
+          .then(function(r) {
+            if (r.error || !r.data) return;
+            var live = r.data.filter(function(t){ return !t.expires_at || new Date(t.expires_at) > new Date(); });
+            if (live.length) renderTestimonies(live);
+          }).catch(function(){});
+      }
+    });
   }
 }
 function renderTestimonies(items) {
