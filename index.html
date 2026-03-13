@@ -3418,22 +3418,37 @@ function injectApprovedChurches(callback) {
       }
     });
   }
-  // Fetch from Google Sheets and inject approved registrations, then call callback
-  if (window.FB && window.FB.db) {
-    window.FB.getDocs(window.FB.collection(window.FB.db, 'church_registrations'))
-      .then(function(snap) {
-        snap.forEach(function(d) {
-          const reg = d.data();
-          if (reg.status === 'approved' && typeof DISTRICTS !== 'undefined') {
-            const dist = DISTRICTS.find(d2 => d2.id === reg.distId);
-            if (dist && dist.churches && !dist.churches.includes(reg.name)) {
-              dist.churches.push(reg.name);
-            }
-          }
-        });
-        if (callback) callback();
-      }).catch(function(){ if (callback) callback(); });
-    return; // callback will fire after GS responds
+  // Fetch from Google Sheets and inject approved registrations cross-device
+  if (GS_CONFIGURED) {
+    // Helper: inject a list of approved church records into DISTRICTS picker
+    function _injectIntoPicker(approvedList) {
+      approvedList.forEach(function(reg) {
+        if (typeof DISTRICTS === 'undefined') return;
+        var dist = DISTRICTS.find(function(d){ return d.id === reg.distId; });
+        if (dist && dist.churches && !dist.churches.includes(reg.name)) {
+          dist.churches.push(reg.name);
+        }
+      });
+    }
+    // Step A: Try the fast 'approved_churches' sheet first (written on approval)
+    _gsGet('getDocs', 'approved_churches').then(function(res) {
+      var rawDocs = (res && Array.isArray(res.docs)) ? res.docs : [];
+      var approved = rawDocs.map(function(d){ return Object.assign({}, d.data || d); });
+      if (approved.length) _injectIntoPicker(approved);
+    }).catch(function(){});
+    // Step B: Also fetch full church_registrations for complete status picture
+    _gsGet('getDocs', 'church_registrations').then(function(res) {
+      var rawDocs = (res && Array.isArray(res.docs)) ? res.docs : [];
+      var allRegs = rawDocs.map(function(d){ return Object.assign({}, d.data || d, {_gsId: d.id}); });
+      var localRegs = LS.get('sda-church-registrations', []);
+      var gsIds = new Set(allRegs.map(function(r){ return r.id; }));
+      localRegs.forEach(function(r){ if (!gsIds.has(r.id)) allRegs.push(r); });
+      LS.set('sda-church-registrations', allRegs);
+      var approvedFromFull = allRegs.filter(function(r){ return r.status === 'approved'; });
+      _injectIntoPicker(approvedFromFull);
+      if (callback) callback();
+    }).catch(function(){ if (callback) callback(); });
+    return;
   }
   if (callback) callback();
 }
@@ -8383,11 +8398,9 @@ function submitChurchRegistration() {
   regs.push(reg);
   LS.set('sda-church-registrations', regs);
 
-  // Try to save to Firebase if available
-  if (window.FB) {
-    const { addDoc, collection, serverTimestamp, db } = window.FB;
-    addDoc(collection(db, 'church_registrations'), Object.assign({}, reg, { ts: serverTimestamp() }))
-      .catch(() => {});
+  // Save to Google Sheets for cross-device visibility
+  if (GS_CONFIGURED) {
+    _gsPost('addDoc', 'church_registrations', reg).catch(function(){});
   }
 
   // Show success screen
@@ -8445,17 +8458,18 @@ function renderRegisteredChurches() {
   var local = LS.get('sda-church-registrations', []);
   _draw(local);
   // Fetch real status from Google Sheets and update
-  if (window.FB && window.FB.db) {
-    window.FB.getDocs(window.FB.collection(window.FB.db, 'church_registrations'))
-      .then(function(snap) {
-        var gsMap = {};
-        snap.forEach(function(d) { var data = d.data(); if (data.id) gsMap[data.id] = data; });
-        var merged = local.map(function(r) {
-          return gsMap[r.id] ? Object.assign({}, r, {status: gsMap[r.id].status}) : r;
-        });
-        LS.set('sda-church-registrations', merged);
-        _draw(merged);
-      }).catch(function(){});
+  if (GS_CONFIGURED) {
+    _gsGet('getDocs', 'church_registrations').then(function(res) {
+      var rawDocs = (res && Array.isArray(res.docs)) ? res.docs : [];
+      var gsRegs = rawDocs.map(function(d){ return Object.assign({}, d.data || d, {_gsId: d.id}); });
+      // Merge: GS is source of truth for status; keep local-only entries too
+      var gsMap = {};
+      gsRegs.forEach(function(r){ if (r.id) gsMap[r.id] = r; });
+      var merged = local.map(function(r){ return gsMap[r.id] ? Object.assign({}, r, gsMap[r.id]) : r; });
+      gsRegs.forEach(function(r){ if (r.id && !local.find(function(l){ return l.id === r.id; })) merged.push(r); });
+      LS.set('sda-church-registrations', merged);
+      _draw(merged);
+    }).catch(function(){});
   }
 }
 
@@ -8503,20 +8517,17 @@ function renderChurchRegAdmin() {
   } else {
     renderList(cached);
   }
-  if (window.FB) {
-    const { getDocs, collection, db } = window.FB;
-    getDocs(collection(db, 'church_registrations'))
-      .then(snap => {
-        const regs = [];
-        snap.forEach(d => { const data = d.data(); data._fbId = d.id; regs.push(data); });
-        const local = LS.get('sda-church-registrations', []);
-        const fbIds = new Set(regs.map(r => r.id));
-        local.forEach(r => { if (!fbIds.has(r.id)) regs.push(r); });
-        LS.set('sda-church-registrations', regs);
-        regs.sort((a,b) => (b.submittedAtMs||0) - (a.submittedAtMs||0));
-        renderList(regs);
-      })
-      .catch(() => {});
+  if (GS_CONFIGURED) {
+    _gsGet('getDocs', 'church_registrations').then(function(res) {
+      var rawDocs = (res && Array.isArray(res.docs)) ? res.docs : [];
+      var regs = rawDocs.map(function(d){ return Object.assign({}, d.data || d, {_gsId: d.id}); });
+      var local = LS.get('sda-church-registrations', []);
+      var gsIds = new Set(regs.map(function(r){ return r.id; }));
+      local.forEach(function(r){ if (!gsIds.has(r.id)) regs.push(r); });
+      LS.set('sda-church-registrations', regs);
+      regs.sort(function(a,b){ return (b.submittedAtMs||0) - (a.submittedAtMs||0); });
+      renderList(regs);
+    }).catch(function(){});
   }
 }
 
@@ -8543,12 +8554,27 @@ function approveChurchReg(id) {
       }
     }
   }
-  // Update in Firebase
-  if (window.FB) {
-    const { getDocs, collection, query, where, updateDoc, doc, db } = window.FB;
-    getDocs(query(collection(db,'church_registrations'), where('id','==',id)))
-      .then(snap => { snap.forEach(d => updateDoc(doc(db,'church_registrations',d.id), {status:'approved',approvedBy:'SEVENTHDAYADVENTIST',approvedAt:new Date().toISOString()}).catch(()=>{})); })
-      .catch(()=>{});
+  // Update status in Google Sheets — find the GS doc id then updateDoc
+  if (GS_CONFIGURED && idx >= 0) {
+    var _approvedReg = regs[idx];
+    var _gsDocId = _approvedReg._gsId || _approvedReg.id;
+    // Update the existing row status
+    _gsPost('updateDoc', 'church_registrations',
+      {status:'approved', approvedBy:'SEVENTHDAYADVENTIST', approvedAt:new Date().toISOString()},
+      {id: _gsDocId}
+    ).catch(function(){});
+    // Also save to a dedicated 'approved_churches' sheet so injectApprovedChurches
+    // can quickly fetch only approved ones on other devices
+    _gsPost('addDoc', 'approved_churches', {
+      id:          _approvedReg.id,
+      name:        _approvedReg.name,
+      distId:      _approvedReg.distId,
+      distName:    _approvedReg.distName || '',
+      conf:        _approvedReg.conf || '',
+      confName:    _approvedReg.confName || '',
+      approvedAt:  new Date().toISOString(),
+      approvedBy:  'SEVENTHDAYADVENTIST'
+    }).catch(function(){});
   }
   if (typeof toast === 'function') toast('✅ Church registration approved!');
   if (typeof addLog === 'function') addLog('Approved church reg: ' + id);
@@ -8560,11 +8586,10 @@ function rejectChurchReg(id) {
   const regs = LS.get('sda-church-registrations', []);
   const filtered = regs.filter(r => r.id !== id);
   LS.set('sda-church-registrations', filtered);
-  if (window.FB) {
-    const { getDocs, collection, query, where, deleteDoc, doc, db } = window.FB;
-    getDocs(query(collection(db,'church_registrations'), where('id','==',id)))
-      .then(snap => { snap.forEach(d => deleteDoc(doc(db,'church_registrations',d.id)).catch(()=>{})); })
-      .catch(()=>{});
+  if (GS_CONFIGURED) {
+    var _rejReg = LS.get('sda-church-registrations', []).concat(filtered).find(function(r){ return r.id === id; });
+    var _rejGsId = _rejReg && (_rejReg._gsId || _rejReg.id);
+    if (_rejGsId) _gsPost('deleteDoc', 'church_registrations', {}, {id: _rejGsId}).catch(function(){});
   }
   if (typeof toast === 'function') toast('❌ Church registration rejected.');
   if (typeof addLog === 'function') addLog('Rejected church reg: ' + id);
