@@ -5487,37 +5487,59 @@ function confirmDelMedia(dbId,el,type){
   ok.textContent='Delete';
   ok.onclick=()=>{
     ov.remove();
-    // Find item — cloud items use _delKey, IndexedDB items use numeric dbId
-    const cloudIdx = mediaItems.findIndex(m => m._delKey && m._delKey === dbId);
-    const idbIdx   = mediaItems.findIndex(m => m.dbId !== undefined && m.dbId === dbId);
+    // Find item — try _delKey, _gsId, dbId, or URL match
+    var cloudIdx = mediaItems.findIndex(function(m){ return m._delKey && m._delKey === dbId; });
+    if (cloudIdx < 0) cloudIdx = mediaItems.findIndex(function(m){ return m._gsId && m._gsId === dbId; });
+    var idbIdx = cloudIdx < 0 ? mediaItems.findIndex(function(m){ return m.dbId !== undefined && m.dbId === dbId; }) : -1;
 
-    if(cloudIdx >= 0){
-      // ── Cloud (Cloudinary/localStorage) item ──
-      const item = mediaItems[cloudIdx];
-      if(item.url && item.url.startsWith('blob:')) URL.revokeObjectURL(item.url);
-      mediaItems.splice(cloudIdx, 1);
-      try{
+    function _deleteFromGS(item) {
+      // Remove from Google Sheets using the GS doc id
+      var gsDocId = item._gsId || item._delKey || item.id;
+      if (GS_CONFIGURED && gsDocId) {
+        _gsPost('deleteDoc', 'media', {}, {id: gsDocId}).catch(function(){});
+      }
+      // Remove from localStorage
+      try {
         var saved = JSON.parse(localStorage.getItem('sda-media-cloud') || '[]');
-        saved = saved.filter(s => s._delKey !== dbId && s.downloadURL !== item.downloadURL);
+        saved = saved.filter(function(s){
+          return s._delKey !== item._delKey &&
+                 s._gsId   !== item._gsId   &&
+                 (s.downloadURL || s.url) !== (item.downloadURL || item.url);
+        });
         localStorage.setItem('sda-media-cloud', JSON.stringify(saved));
-      }catch(e){}
-      if(el) el.remove();
-      updStats(); toast(type + ' deleted \u2713');
+      } catch(e) {}
+    }
+
+    if (cloudIdx >= 0) {
+      // ── Cloud (Cloudinary / GS-loaded) item ──
+      const item = mediaItems[cloudIdx];
+      if (item.url && item.url.startsWith('blob:')) URL.revokeObjectURL(item.url);
+      mediaItems.splice(cloudIdx, 1);
+      _deleteFromGS(item);
+      if (el) el.remove();
+      updStats(); toast(type + ' deleted ✓');
       renderAdminMediaPanels();
-    } else if(idbIdx >= 0){
+    } else if (idbIdx >= 0) {
       // ── IndexedDB item ──
       const item = mediaItems[idbIdx];
       MediaDB.del(item.dbId).then(() => {
-        if(item.url && item.url.startsWith('blob:')) URL.revokeObjectURL(item.url);
+        if (item.url && item.url.startsWith('blob:')) URL.revokeObjectURL(item.url);
         mediaItems.splice(idbIdx, 1);
-        if(el) el.remove();
-        updStats(); toast(type + ' deleted \u2713');
+        _deleteFromGS(item);
+        if (el) el.remove();
+        updStats(); toast(type + ' deleted ✓');
         renderAdminMediaPanels();
       }).catch(err => toast('Delete failed: ' + err.message));
     } else {
-      // ── Fallback (item not in memory, remove DOM only) ──
-      if(el) el.remove();
-      toast(type + ' removed');
+      // ── Last resort: match by URL in mediaItems ──
+      var urlIdx = mediaItems.findIndex(function(m){ return (m.url||m.downloadURL) === dbId; });
+      if (urlIdx >= 0) {
+        var item2 = mediaItems[urlIdx];
+        mediaItems.splice(urlIdx, 1);
+        _deleteFromGS(item2);
+      }
+      if (el) el.remove();
+      updStats(); toast(type + ' removed');
       renderAdminMediaPanels();
     }
   };
@@ -5775,7 +5797,7 @@ function renderAdminMediaPanels(){
         +'<button class="del-btn btn btn-r" style="padding:5px 10px;font-size:11px" title="Delete">\uD83D\uDDD1 Delete</button></div>'
         +'<div class="mi">'+e(item.preacher||'Unknown')+(item.church?' \u00b7 \u26ea '+e(item.church):'')+' \u00b7 '+e(item.postedAt||'')+(expiryA?' <span style="color:var(--text3);font-size:9.5px;margin-left:4px">'+expiryA+'</span>':'')+'</div>'
         +'<audio controls src="'+item.url+'" style="width:100%;margin-top:5px;border-radius:6px"></audio>';
-      const capturedDbId=item._delKey || item.dbId;
+      const capturedDbId=item._delKey || item._gsId || item.dbId;
       div.querySelector('.del-btn').onclick=()=>confirmDelMedia(capturedDbId,div,'audio');
       aFrag.appendChild(div);
     } else if(item.type==='video'){
@@ -5793,7 +5815,7 @@ function renderAdminMediaPanels(){
         +'<div style="font-size:36px">\u25B6\uFE0F</div>'
         +'<div style="font-size:11px;color:rgba(255,255,255,.6);margin-top:4px">Tap to play</div>'
         +'</div>';
-      const capturedDbId=item._delKey || item.dbId;
+      const capturedDbId=item._delKey || item._gsId || item.dbId;
       const capturedVUrl=item.url;
       div.querySelector('.del-btn').onclick=()=>confirmDelMedia(capturedDbId,div,'video');
       div.querySelector('.vid-thumb').onclick=function(){
@@ -5874,7 +5896,7 @@ async function loadPersistedMedia(){
         var mChurchId = m.churchId || (m.church ? makeChurchId(m.church) : null);
         if (adminChurchId && mChurchId && mChurchId !== adminChurchId) return;
         existingUrls.add(mUrl);
-        mediaItems.push(Object.assign({}, m, { url: mUrl, source: m.source || 'cloudinary' }));
+        mediaItems.push(Object.assign({}, m, { url: mUrl, source: m.source || 'cloudinary', _gsId: m._gsId || m.id || m._id }));
         added++;
       });
       return added;
@@ -6899,11 +6921,17 @@ const DAY_MS  = window._DAY_MS  || (24 * 60 * 60 * 1000);
 // ─── SINGLE SOURCE OF TRUTH for church context ─────────────────────────────
 // Priority: 1. logged-in member's churchId  2. IIFE's selectedChurchId  3. 'public'
 function getChurchId() {
+  // Admin always takes priority — they have the most reliable churchId
+  const _adm = window._currentAdminRef ? window._currentAdminRef() : null;
+  if (_adm && _adm.churchId) return _adm.churchId;
+  if (_adm && _adm.church)   return makeChurchId(_adm.church);
   if (typeof currentMember !== 'undefined' && currentMember && currentMember.churchId) {
     return currentMember.churchId;
   }
   if (window._currentChurchKey) return window._currentChurchKey();
-  // Fallback: read directly from localStorage
+  // Fallback: selected church from picker
+  if (typeof selectedChurchId !== 'undefined' && selectedChurchId) return selectedChurchId;
+  // Last resort: localStorage
   try {
     const saved = JSON.parse(localStorage.getItem('sda-church') || 'null');
     if (saved && saved.churchId) return saved.churchId;
@@ -8254,7 +8282,9 @@ function loadFirestoreTestimonies() {
       var gsIds = new Set(gsRows.map(function(r){ return r.id; }));
       localNow.forEach(function(r){ if (!gsIds.has(r.id)) gsRows.push(r); });
       var live = gsRows.filter(function(t){ return !t.expiresAt || t.expiresAt > Date.now(); });
-      if (live.length) { LS.set(key, live); renderTestimonies(live); }
+      // Always render — even empty list clears stale local cache
+      LS.set(key, live);
+      renderTestimonies(live);
     }).catch(function() {
       // GS failed — try Supabase
       if (SUPABASE_CONFIGURED && supabaseClient) {
