@@ -1808,6 +1808,7 @@ textarea.finp { resize:vertical; min-height:90px; }
           <div id="photo-progress-lbl" style="font-size:11px;color:var(--text3);margin-top:5px"></div>
         </div>
         <div class="pgal" id="pgal"></div>
+        <div style="display:none">
         <div class="sdiv">🎵 Audio Sermon</div>
         <label class="flbl">Sermon Title</label><input class="finp" id="at" type="text" placeholder="e.g. Living by Faith">
         <label class="flbl">Preacher</label><input class="finp" id="apr" type="text" placeholder="Preacher name">
@@ -1827,6 +1828,7 @@ textarea.finp { resize:vertical; min-height:90px; }
         </div>
         <div class="mplay" id="aplay"><audio controls id="a-el" style="width:100%;margin-top:9px;border-radius:9px"></audio></div>
         <div class="mlist" id="a-list"></div>
+        </div>
         <div class="sdiv">🎬 Event Videos</div>
         <label class="flbl">Video Title</label><input class="finp" id="vt" type="text" placeholder="e.g. Sabbath Worship Service">
         <label class="flbl">Preacher</label><input class="finp" id="vpr" type="text" placeholder="Preacher name">
@@ -5555,10 +5557,8 @@ function toEmbedURL(url){
       return 'https://www.youtube.com/embed/'+id+'?autoplay=1&rel=0&modestbranding=1';
     }
     if(host==='facebook.com'||host==='www.facebook.com'||host==='fb.watch'){
-      // fb.watch short links cannot be resolved by plugins/video.php — store as sentinel
-      if(host==='fb.watch') return 'fbwatch:'+url;
-      // width+height are required or Facebook returns a blank box
-      return 'https://www.facebook.com/plugins/video.php?href='+encodeURIComponent(url)+'&show_text=0&width=560&height=315&autoplay=0';
+      // Facebook embeds need the full URL but it's safely encoded
+      return 'https://www.facebook.com/plugins/video.php?href='+encodeURIComponent(url)+'&show_text=0&autoplay=1';
     }
   }catch{}
   return null;
@@ -5970,6 +5970,43 @@ function _makeYTEmbed(wrapper,videoId){
   else{_ytPending.push(init);_ensureYTApi();}
 }
 // ──────────────────────────────────────────────────────────────────────────────
+function _makeVideoButtons(item){
+  // Builds Open + Share buttons for a video item (YouTube or Facebook link)
+  const originalUrl = item.originalUrl || (
+    item.source==='youtube' && item.url && item.url.includes('youtube.com/embed')
+      ? 'https://www.youtube.com/watch?v=' + (item.url.match(/embed\/([a-zA-Z0-9_-]{11})/)||[])[1]
+      : item.url && item.url.startsWith('fbwatch:')
+        ? item.url.slice(8)
+        : null
+  );
+  if(!originalUrl) return null;
+  const isYT = originalUrl.includes('youtube') || originalUrl.includes('youtu.be');
+  const row = document.createElement('div');
+  row.style.cssText = 'display:flex;gap:8px;margin-top:8px;flex-wrap:wrap';
+  // Open button
+  const openBtn = document.createElement('a');
+  openBtn.href = originalUrl;
+  openBtn.target = '_blank';
+  openBtn.rel = 'noopener noreferrer';
+  openBtn.style.cssText = 'flex:1;display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:8px 10px;border-radius:8px;font-size:12px;font-weight:700;text-decoration:none;color:#fff;background:'+(isYT?'#ff0000':'#1877f2');
+  openBtn.innerHTML = (isYT ? '▶ Watch on YouTube' : '▶ Watch on Facebook');
+  // Share button
+  const shareBtn = document.createElement('button');
+  shareBtn.style.cssText = 'flex:1;display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:8px 10px;border-radius:8px;font-size:12px;font-weight:700;border:none;cursor:pointer;color:#fff;background:var(--em)';
+  shareBtn.innerHTML = '🔗 Share';
+  shareBtn.onclick = function(){
+    if(navigator.share){
+      navigator.share({title:item.title||'Video',url:originalUrl}).catch(()=>{});
+    } else {
+      navigator.clipboard.writeText(originalUrl).then(()=>toast('Link copied!')).catch(()=>{
+        prompt('Copy this link:',originalUrl);
+      });
+    }
+  };
+  row.appendChild(openBtn);
+  row.appendChild(shareBtn);
+  return row;
+}
 function _renderPublicMediaContent(){
   const el=document.getElementById('pub-media-content');
   if(!el)return;
@@ -6046,29 +6083,13 @@ function _renderPublicMediaContent(){
       const meta=document.createElement('div');meta.className='mi';
       meta.textContent=(item.preacher||'')+(item.church?' \u00b7 \u26ea '+item.church:'')+(item.postedAt?' \u00b7 '+item.postedAt:'');
       const isYT = item.source==='youtube' || (item.url&&item.url.includes('youtube.com/embed'));
-      const isFB = item.source==='facebook' || (item.url&&item.url.includes('facebook.com/plugins/video')) || (item.url&&item.url.startsWith('fbwatch:'));
+      const isFB = item.source==='facebook' || (item.url&&item.url.includes('facebook.com/plugins/video'));
       const player=document.createElement('div');
       if(isYT||isFB){
         player.style.cssText='position:relative;width:100%;padding-top:56.25%;margin-top:8px;border-radius:8px;overflow:hidden;background:#000';
         const _ytId1=_ytIdFromEmbed(item.url);
         if(isYT&&_ytId1){_makeYTEmbed(player,_ytId1);}
-        else if(item.url&&item.url.startsWith('fbwatch:')){
-          // fb.watch short links can't be embedded — show open button instead
-          const _fbLink=item.url.slice(8);
-          const _fbBtn=document.createElement('a');
-          _fbBtn.href=_fbLink;_fbBtn.target='_blank';_fbBtn.rel='noopener noreferrer';
-          _fbBtn.style.cssText='position:absolute;top:0;left:0;width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#1877f2;color:#fff;text-decoration:none;gap:8px;border-radius:8px';
-          _fbBtn.innerHTML='<span style="font-size:36px">▶️</span><span style="font-size:13px;font-weight:700">Watch on Facebook</span>';
-          player.appendChild(_fbBtn);
-        } else {
-          const _fbIfr=document.createElement('iframe');
-          _fbIfr.src=item.url;
-          _fbIfr.style.cssText='position:absolute;top:0;left:0;width:100%;height:100%;border:none';
-          _fbIfr.allow='autoplay;clipboard-write;encrypted-media;picture-in-picture;web-share';
-          _fbIfr.allowFullscreen=true;
-          _fbIfr.setAttribute('loading','lazy');
-          player.appendChild(_fbIfr);
-        }
+        else{player.innerHTML='<iframe src="'+item.url+'" style="position:absolute;top:0;left:0;width:100%;height:100%;border:none" allowfullscreen loading="lazy"></iframe>';}
       } else {
         const capturedUrl2=item.url;
         player.style.cssText='width:100%;background:#111;border-radius:8px;overflow:hidden;cursor:pointer;position:relative;min-height:80px;display:flex;align-items:center;justify-content:center;margin-top:6px';
@@ -6080,7 +6101,8 @@ function _renderPublicMediaContent(){
           this.replaceWith(vid);
         };
       }
-      div.append(h4,meta,player);vlist.appendChild(div);
+      div.append(h4,meta,player);
+      vlist.appendChild(div);
     });
   }
 
@@ -6185,7 +6207,7 @@ function renderAdminMediaPanels(){
       videoCount++;
       const div=document.createElement('div');div.className='mitm';
       const isYT = item.source==='youtube' || (item.url&&item.url.includes('youtube.com/embed'));
-      const isFB = item.source==='facebook' || (item.url&&item.url.includes('facebook.com/plugins/video')) || (item.url&&item.url.startsWith('fbwatch:'));
+      const isFB = item.source==='facebook' || (item.url&&item.url.includes('facebook.com/plugins/video'));
       const isEmbed = isYT || isFB;
       // Build admin video card via DOM (enables YT error detection)
       const _adHdr=document.createElement('div');
@@ -6202,20 +6224,11 @@ function renderAdminMediaPanels(){
         const _ytId2=_ytIdFromEmbed(item.url);
         if(isYT&&_ytId2){
           _makeYTEmbed(_adWrap,_ytId2);
-        } else if(item.url&&item.url.startsWith('fbwatch:')){
-          const _fbLink2=item.url.slice(8);
-          const _fbBtn2=document.createElement('a');
-          _fbBtn2.href=_fbLink2;_fbBtn2.target='_blank';_fbBtn2.rel='noopener noreferrer';
-          _fbBtn2.style.cssText='position:absolute;top:0;left:0;width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#1877f2;color:#fff;text-decoration:none;gap:8px;border-radius:8px';
-          _fbBtn2.innerHTML='<span style="font-size:36px">▶️</span><span style="font-size:13px;font-weight:700">Watch on Facebook</span>';
-          _adWrap.appendChild(_fbBtn2);
         } else {
           const _adIfr=document.createElement('iframe');
           _adIfr.src=item.url;
           _adIfr.style.cssText='position:absolute;top:0;left:0;width:100%;height:100%;border:none';
-          _adIfr.allow='autoplay;clipboard-write;encrypted-media;picture-in-picture;web-share';
-          _adIfr.allowFullscreen=true;
-          _adIfr.setAttribute('loading','lazy');
+          _adIfr.setAttribute('allowfullscreen','');_adIfr.setAttribute('loading','lazy');
           _adWrap.appendChild(_adIfr);
         }
         div.appendChild(_adWrap);
@@ -6237,6 +6250,8 @@ function renderAdminMediaPanels(){
           this.replaceWith(vid);
         };
       }
+      const _admBtns = _makeVideoButtons(item);
+      if(_admBtns) div.appendChild(_admBtns);
       vFrag.appendChild(div);
     }
   });
@@ -6877,13 +6892,12 @@ function handleVideo(){
   var isFB = rawUrl.indexOf('facebook.com')!==-1 || rawUrl.indexOf('fb.watch')!==-1;
   var source = isFB ? 'facebook' : 'youtube';
   var rec=_buildMediaRecord({mediaType:'video',name:title,mimeType:source,title:title,preacher:preacher,uploadedDate:new Date().toLocaleDateString()});
-  var item={type:'video',url:embedUrl,title:title,preacher:preacher,church:rec.church,churchId:rec.churchId,dist:rec.dist,postedBy:rec.postedBy,postedAt:rec.postedAt,postedAtMs:rec.postedAtMs,uploadedDate:rec.uploadedDate,source:source};
+  var item={type:'video',url:embedUrl,originalUrl:rawUrl,title:title,preacher:preacher,church:rec.church,churchId:rec.churchId,dist:rec.dist,postedBy:rec.postedBy,postedAt:rec.postedAt,postedAtMs:rec.postedAtMs,uploadedDate:rec.uploadedDate,source:source};
   mediaItems.push(item);
   if(GS_CONFIGURED){_gsPost('addDoc','media',item).catch(function(){});}
   var saved=JSON.parse(localStorage.getItem('sda-media-cloud')||'[]');
   saved.push(item);
   try{localStorage.setItem('sda-media-cloud',JSON.stringify(saved));}catch(ex){}
-  _supabaseSaveMeta(item);
   ['vt','vpr','yt-url'].forEach(function(id){var x=document.getElementById(id);if(x)x.value='';});
   _mediaMsg('video','ok','"'+title+'" added successfully.');
   renderAdminMediaPanels();updStats();addLog('Video: '+title);
