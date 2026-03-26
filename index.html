@@ -7113,20 +7113,20 @@ self.addEventListener('fetch',ev=>{
   }
 
   // Install prompt handling
-  let dp=null;
+  window._pwaPrompt=null;
   window.addEventListener('beforeinstallprompt',ev=>{
-    ev.preventDefault();dp=ev;
+    ev.preventDefault();window._pwaPrompt=ev;
     setTimeout(()=>document.getElementById('pwa-banner')?.classList.add('on'),3000);
   });
   window.addEventListener('appinstalled',()=>{
-    document.getElementById('pwa-banner')?.classList.remove('on');dp=null;
+    document.getElementById('pwa-banner')?.classList.remove('on');window._pwaPrompt=null;
     typeof toast==='function'&&toast('✅ SDA Portal installed — find it on your home screen!',4500);
   });
   window.installPWA=async function(){
-    if(!dp){typeof toast==='function'&&toast('Tap browser menu → "Add to Home Screen" to install');return;}
-    dp.prompt();const{outcome}=await dp.userChoice;
+    if(!window._pwaPrompt){typeof toast==='function'&&toast('Tap browser menu → "Add to Home Screen" to install');return;}
+    window._pwaPrompt.prompt();const{outcome}=await window._pwaPrompt.userChoice;
     if(outcome==='accepted')document.getElementById('pwa-banner')?.classList.remove('on');
-    dp=null;
+    window._pwaPrompt=null;
   };
   window.dismissPWA=function(){
     document.getElementById('pwa-banner')?.classList.remove('on');
@@ -7146,7 +7146,7 @@ self.addEventListener('fetch',ev=>{
 
   // ── Expose HTML-event-handler functions to window (required for onclick= attributes)
   // ── All other app state remains private inside this IIFE scope.
-  window._dFilterChurches=_dFilterChurches;window._dFilterDists=_dFilterDists;window._dRenderLib=_dRenderLib;window._dRenderRec=_dRenderRec;window._dRenderStories=_dRenderStories;window._dSearchHealth=_dSearchHealth;window.addAct=addAct;window.addMiss=addMiss;window.adminGoLive=adminGoLive;window.calNext=calNext;window.calPrev=calPrev;window.chH=chH;window.closeLB=closeLB;window.closeStory=closeStory;window.delAct=delAct;window.dismissPWA=dismissPWA;window.doLogin=doLogin;window.doLogout=doLogout;window.doRegister=doRegister;window.downloadLog=downloadLog;window.endStream=endStream;window.restoreActiveStream=restoreActiveStream;window.startStreamPolling=startStreamPolling;window.stopStreamPolling=stopStreamPolling;window.goBack1=goBack1;window.goBack2=goBack2;window.handleActPhoto=handleActPhoto;window.handleAudio=handleAudio;window.handlePhotos=handlePhotos;window.handleVideo=handleVideo;window.hidePicker=hidePicker;window.installPWA=installPWA;window.nav=nav;window.addPhotosLocal=addPhotosLocal;window.testCloudinary=testCloudinary;window.testSupabase=testSupabase;window.addPhotoFromURL=addPhotoFromURL;window.nav._isStub=false;window.openStory=openStory;window.pickConf=pickConf;window.pickManualChurch=pickManualChurch;window.pinMsg=pinMsg;window.quickLaunch=quickLaunch;window.regConfChange=regConfChange;window.regDistChange=regDistChange;window.rndH=rndH;window.sendAnn=sendAnn;window.sendChat=sendChat;window.setActsFilter=setActsFilter;window.setHCat=setHCat;window.setLibF=setLibF;window.setMode=setMode;window.setRecF=setRecF;window.setStF=setStF;window.shareAct=shareAct;window.showPicker=showPicker;window.showRegManual=showRegManual;window.submitPrayer=submitPrayer;window.submitReq=submitReq;window.swSec=swSec;window.swTab=swTab;window.togRec=togRec;window.toggleCalView=toggleCalView;window.toggleListView=toggleListView;window.toggleTheme=toggleTheme;window.memRegConfChange=memRegConfChange;window.memRegDistChange=memRegDistChange;window.memCCConfChange=memCCConfChange;window.memCCDistChange=memCCDistChange;window.memSaveChurch=memSaveChurch;window.toggleMin=toggleMin;window.submitSubscription=submitSubscription;window.subConfChange=subConfChange;window.subDistChange=subDistChange;window.renderSubRequests=renderSubRequests;window.approveSubRequest=approveSubRequest;window.rejectSubRequest=rejectSubRequest;window.renderSubBadge=renderSubBadge;
+  window._dFilterChurches=_dFilterChurches;window._dFilterDists=_dFilterDists;window._dRenderLib=_dRenderLib;window._dRenderRec=_dRenderRec;window._dRenderStories=_dRenderStories;window._dSearchHealth=_dSearchHealth;window.addAct=addAct;window.addMiss=addMiss;window.adminGoLive=adminGoLive;window.calNext=calNext;window.calPrev=calPrev;window.chH=chH;window.closeLB=closeLB;window.closeStory=closeStory;window.delAct=delAct;window.doLogin=doLogin;window.doLogout=doLogout;window.doRegister=doRegister;window.downloadLog=downloadLog;window.endStream=endStream;window.restoreActiveStream=restoreActiveStream;window.startStreamPolling=startStreamPolling;window.stopStreamPolling=stopStreamPolling;window.goBack1=goBack1;window.goBack2=goBack2;window.handleActPhoto=handleActPhoto;window.handleAudio=handleAudio;window.handlePhotos=handlePhotos;window.handleVideo=handleVideo;window.hidePicker=hidePicker;window.nav=nav;window.addPhotosLocal=addPhotosLocal;window.testCloudinary=testCloudinary;window.testSupabase=testSupabase;window.addPhotoFromURL=addPhotoFromURL;window.nav._isStub=false;window.openStory=openStory;window.pickConf=pickConf;window.pickManualChurch=pickManualChurch;window.pinMsg=pinMsg;window.quickLaunch=quickLaunch;window.regConfChange=regConfChange;window.regDistChange=regDistChange;window.rndH=rndH;window.sendAnn=sendAnn;window.sendChat=sendChat;window.setActsFilter=setActsFilter;window.setHCat=setHCat;window.setLibF=setLibF;window.setMode=setMode;window.setRecF=setRecF;window.setStF=setStF;window.shareAct=shareAct;window.showPicker=showPicker;window.showRegManual=showRegManual;window.submitPrayer=submitPrayer;window.submitReq=submitReq;window.swSec=swSec;window.swTab=swTab;window.togRec=togRec;window.toggleCalView=toggleCalView;window.toggleListView=toggleListView;window.toggleTheme=toggleTheme;window.memRegConfChange=memRegConfChange;window.memRegDistChange=memRegDistChange;window.memCCConfChange=memCCConfChange;window.memCCDistChange=memCCDistChange;window.memSaveChurch=memSaveChurch;window.toggleMin=toggleMin;window.submitSubscription=submitSubscription;window.subConfChange=subConfChange;window.subDistChange=subDistChange;window.renderSubRequests=renderSubRequests;window.approveSubRequest=approveSubRequest;window.rejectSubRequest=rejectSubRequest;window.renderSubBadge=renderSubBadge;
 window.minTab=minTab;
 function toggleAcc(key){const btn=document.getElementById('acc-'+key);const body=document.getElementById('acc-body-'+key);if(!btn||!body)return;const opening=!body.classList.contains('open');btn.classList.toggle('open',opening);body.classList.toggle('open',opening);btn.setAttribute('aria-expanded',opening);try{var s=JSON.parse(localStorage.getItem('sda-acc-state')||'{}');s[key]=opening;localStorage.setItem('sda-acc-state',JSON.stringify(s));}catch(e){}}
 window.toggleAcc=toggleAcc;
