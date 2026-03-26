@@ -5555,8 +5555,10 @@ function toEmbedURL(url){
       return 'https://www.youtube.com/embed/'+id+'?autoplay=1&rel=0&modestbranding=1';
     }
     if(host==='facebook.com'||host==='www.facebook.com'||host==='fb.watch'){
-      // Facebook embeds need the full URL but it's safely encoded
-      return 'https://www.facebook.com/plugins/video.php?href='+encodeURIComponent(url)+'&show_text=0&autoplay=1';
+      // fb.watch short links cannot be resolved by plugins/video.php — store as sentinel
+      if(host==='fb.watch') return 'fbwatch:'+url;
+      // width+height are required or Facebook returns a blank box
+      return 'https://www.facebook.com/plugins/video.php?href='+encodeURIComponent(url)+'&show_text=0&width=560&height=315&autoplay=0';
     }
   }catch{}
   return null;
@@ -5927,6 +5929,47 @@ function renderPublicMedia(){
   }
   _renderPublicMediaContent();
 }
+
+// ── YouTube IFrame API: error-aware embed ─────────────────────────────────────
+let _ytAPIReady=false;
+const _ytPending=[];
+window.onYouTubeIframeAPIReady=function(){
+  _ytAPIReady=true;
+  while(_ytPending.length) _ytPending.shift()();
+};
+function _ensureYTApi(){
+  if(window.YT&&window.YT.Player){_ytAPIReady=true;return;}
+  if(!document.querySelector('script[src*="youtube.com/iframe_api"]')){
+    const s=document.createElement('script');
+    s.src='https://www.youtube.com/iframe_api';
+    document.head.appendChild(s);
+  }
+}
+function _ytIdFromEmbed(u){
+  const m=u&&u.match(/youtube\.com\/embed\/([a-zA-Z0-9_-]{11})/);
+  return m?m[1]:null;
+}
+function _makeYTEmbed(wrapper,videoId){
+  const uid='ytp-'+Math.random().toString(36).slice(2);
+  const ph=document.createElement('div');
+  ph.id=uid;
+  ph.style.cssText='position:absolute;top:0;left:0;width:100%;height:100%';
+  wrapper.appendChild(ph);
+  const init=()=>{
+    new YT.Player(uid,{
+      videoId:videoId,
+      playerVars:{rel:0,modestbranding:1},
+      events:{
+        onError:function(){
+          wrapper.innerHTML='<div style="position:absolute;top:0;left:0;width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#111;color:rgba(255,255,255,.65);font-size:13px;gap:8px;text-align:center;padding:16px;border-radius:8px"><span style="font-size:36px">⚠️</span><strong style="color:rgba(255,255,255,.85)">Video Unavailable</strong><span>This video has been removed, made private, or cannot be embedded.</span></div>';
+        }
+      }
+    });
+  };
+  if(_ytAPIReady) init();
+  else{_ytPending.push(init);_ensureYTApi();}
+}
+// ──────────────────────────────────────────────────────────────────────────────
 function _renderPublicMediaContent(){
   const el=document.getElementById('pub-media-content');
   if(!el)return;
@@ -6003,11 +6046,29 @@ function _renderPublicMediaContent(){
       const meta=document.createElement('div');meta.className='mi';
       meta.textContent=(item.preacher||'')+(item.church?' \u00b7 \u26ea '+item.church:'')+(item.postedAt?' \u00b7 '+item.postedAt:'');
       const isYT = item.source==='youtube' || (item.url&&item.url.includes('youtube.com/embed'));
-      const isFB = item.source==='facebook' || (item.url&&item.url.includes('facebook.com/plugins/video'));
+      const isFB = item.source==='facebook' || (item.url&&item.url.includes('facebook.com/plugins/video')) || (item.url&&item.url.startsWith('fbwatch:'));
       const player=document.createElement('div');
       if(isYT||isFB){
         player.style.cssText='position:relative;width:100%;padding-top:56.25%;margin-top:8px;border-radius:8px;overflow:hidden;background:#000';
-        player.innerHTML='<iframe src="'+item.url+'" style="position:absolute;top:0;left:0;width:100%;height:100%;border:none" allowfullscreen loading="lazy"></iframe>';
+        const _ytId1=_ytIdFromEmbed(item.url);
+        if(isYT&&_ytId1){_makeYTEmbed(player,_ytId1);}
+        else if(item.url&&item.url.startsWith('fbwatch:')){
+          // fb.watch short links can't be embedded — show open button instead
+          const _fbLink=item.url.slice(8);
+          const _fbBtn=document.createElement('a');
+          _fbBtn.href=_fbLink;_fbBtn.target='_blank';_fbBtn.rel='noopener noreferrer';
+          _fbBtn.style.cssText='position:absolute;top:0;left:0;width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#1877f2;color:#fff;text-decoration:none;gap:8px;border-radius:8px';
+          _fbBtn.innerHTML='<span style="font-size:36px">▶️</span><span style="font-size:13px;font-weight:700">Watch on Facebook</span>';
+          player.appendChild(_fbBtn);
+        } else {
+          const _fbIfr=document.createElement('iframe');
+          _fbIfr.src=item.url;
+          _fbIfr.style.cssText='position:absolute;top:0;left:0;width:100%;height:100%;border:none';
+          _fbIfr.allow='autoplay;clipboard-write;encrypted-media;picture-in-picture;web-share';
+          _fbIfr.allowFullscreen=true;
+          _fbIfr.setAttribute('loading','lazy');
+          player.appendChild(_fbIfr);
+        }
       } else {
         const capturedUrl2=item.url;
         player.style.cssText='width:100%;background:#111;border-radius:8px;overflow:hidden;cursor:pointer;position:relative;min-height:80px;display:flex;align-items:center;justify-content:center;margin-top:6px';
@@ -6124,16 +6185,47 @@ function renderAdminMediaPanels(){
       videoCount++;
       const div=document.createElement('div');div.className='mitm';
       const isYT = item.source==='youtube' || (item.url&&item.url.includes('youtube.com/embed'));
-      const isFB = item.source==='facebook' || (item.url&&item.url.includes('facebook.com/plugins/video'));
+      const isFB = item.source==='facebook' || (item.url&&item.url.includes('facebook.com/plugins/video')) || (item.url&&item.url.startsWith('fbwatch:'));
       const isEmbed = isYT || isFB;
-      div.innerHTML='<div style="display:flex;justify-content:space-between;align-items:flex-start">'
-        +'<h4>\uD83C\uDFA5 '+e(item.title||item.name||'Video')+'</h4>'
-        +'<button class="del-btn" title="Delete">&#x1F5D1;</button></div>'
-        +'<div class="mi">'+e(item.preacher||'Unknown')+(item.church?' \u00b7 \u26ea '+e(item.church):'')+' \u00b7 '+e(item.postedAt||'')+'</div>'
-        +(isEmbed
-          ? '<div style="position:relative;width:100%;padding-top:56.25%;margin-top:8px;border-radius:8px;overflow:hidden;background:#111"><iframe src="'+item.url+'" style="position:absolute;top:0;left:0;width:100%;height:100%;border:none" allowfullscreen loading="lazy" title="'+e(item.title||'Video')+'" onerror="this.style.display=\'none\';(this.nextSibling||this.parentNode.appendChild(Object.assign(document.createElement(\'div\'),{style:\'position:absolute;top:0;left:0;width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;color:rgba(255,255,255,.6);font-size:12px;gap:6px;text-align:center;padding:12px\',innerHTML:\'<span style=\\\"font-size:30px\\\">⚠️</span>Video unavailable — the link may be broken or private.\'})));"></iframe></div>'
-          : '<div class="vid-thumb" style="width:100%;background:#111;border-radius:8px;cursor:pointer;min-height:80px;display:flex;flex-direction:column;align-items:center;justify-content:center;margin-top:6px"><div style="font-size:36px">\u25B6\uFE0F</div><div style="font-size:11px;color:rgba(255,255,255,.6);margin-top:4px">Tap to play</div></div>'
-        );
+      // Build admin video card via DOM (enables YT error detection)
+      const _adHdr=document.createElement('div');
+      _adHdr.style.cssText='display:flex;justify-content:space-between;align-items:flex-start';
+      const _adH4=document.createElement('h4');_adH4.textContent='\uD83C\uDFA5 '+(item.title||item.name||'Video');
+      const _adDel=document.createElement('button');_adDel.className='del-btn';_adDel.title='Delete';_adDel.innerHTML='\uD83D\uDDD1\uFE0F';
+      _adHdr.appendChild(_adH4);_adHdr.appendChild(_adDel);
+      const _adMeta=document.createElement('div');_adMeta.className='mi';
+      _adMeta.textContent=(item.preacher||'Unknown')+(item.church?' \u00b7 \u26ea '+item.church:'')+(item.postedAt?' \u00b7 '+item.postedAt:'');
+      div.appendChild(_adHdr);div.appendChild(_adMeta);
+      if(isEmbed){
+        const _adWrap=document.createElement('div');
+        _adWrap.style.cssText='position:relative;width:100%;padding-top:56.25%;margin-top:8px;border-radius:8px;overflow:hidden;background:#111';
+        const _ytId2=_ytIdFromEmbed(item.url);
+        if(isYT&&_ytId2){
+          _makeYTEmbed(_adWrap,_ytId2);
+        } else if(item.url&&item.url.startsWith('fbwatch:')){
+          const _fbLink2=item.url.slice(8);
+          const _fbBtn2=document.createElement('a');
+          _fbBtn2.href=_fbLink2;_fbBtn2.target='_blank';_fbBtn2.rel='noopener noreferrer';
+          _fbBtn2.style.cssText='position:absolute;top:0;left:0;width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#1877f2;color:#fff;text-decoration:none;gap:8px;border-radius:8px';
+          _fbBtn2.innerHTML='<span style="font-size:36px">▶️</span><span style="font-size:13px;font-weight:700">Watch on Facebook</span>';
+          _adWrap.appendChild(_fbBtn2);
+        } else {
+          const _adIfr=document.createElement('iframe');
+          _adIfr.src=item.url;
+          _adIfr.style.cssText='position:absolute;top:0;left:0;width:100%;height:100%;border:none';
+          _adIfr.allow='autoplay;clipboard-write;encrypted-media;picture-in-picture;web-share';
+          _adIfr.allowFullscreen=true;
+          _adIfr.setAttribute('loading','lazy');
+          _adWrap.appendChild(_adIfr);
+        }
+        div.appendChild(_adWrap);
+      } else {
+        const _adThumb=document.createElement('div');
+        _adThumb.className='vid-thumb';
+        _adThumb.style.cssText='width:100%;background:#111;border-radius:8px;cursor:pointer;min-height:80px;display:flex;flex-direction:column;align-items:center;justify-content:center;margin-top:6px';
+        _adThumb.innerHTML='<div style="font-size:36px">\u25B6\uFE0F</div><div style="font-size:11px;color:rgba(255,255,255,.6);margin-top:4px">Tap to play</div>';
+        div.appendChild(_adThumb);
+      }
       const capturedDbId=item._delKey || item.dbId || item._gsId;
       div.querySelector('.del-btn').onclick=()=>confirmDelMedia(capturedDbId,div,'video');
       if(!isEmbed){
@@ -6791,6 +6883,7 @@ function handleVideo(){
   var saved=JSON.parse(localStorage.getItem('sda-media-cloud')||'[]');
   saved.push(item);
   try{localStorage.setItem('sda-media-cloud',JSON.stringify(saved));}catch(ex){}
+  _supabaseSaveMeta(item);
   ['vt','vpr','yt-url'].forEach(function(id){var x=document.getElementById(id);if(x)x.value='';});
   _mediaMsg('video','ok','"'+title+'" added successfully.');
   renderAdminMediaPanels();updStats();addLog('Video: '+title);
