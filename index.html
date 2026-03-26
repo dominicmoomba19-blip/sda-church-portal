@@ -9668,8 +9668,8 @@ function doRejectSubConfirmed(username) {
     <strong>Install SDA Portal</strong>
     <small>Add to your home screen for the best experience</small>
   </div>
-  <button class="pwa-install" id="pwa-install-btn">Install</button>
-  <button class="pwa-dismiss" onclick="document.getElementById('pwa-banner').classList.remove('on')">✕</button>
+  <button class="pwa-install" id="pwa-install-btn" onclick="window.installPWA()">Install</button>
+  <button class="pwa-dismiss" onclick="window.dismissPWA()">✕</button>
 </div>
 
 <!-- duplicate PWA install block removed -->
