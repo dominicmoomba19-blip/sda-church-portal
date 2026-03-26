@@ -5554,7 +5554,7 @@ function toEmbedURL(url){
       const id=extractYouTubeId(url);
       if(!id)return null; // no parseable video ID — refuse
       // Construct from our own template, zero user-supplied strings in output
-      return 'https://www.youtube.com/embed/'+id+'?autoplay=1&rel=0&modestbranding=1';
+      return 'https://www.youtube.com/embed/'+id+'?rel=0&modestbranding=1';
     }
     if(host==='facebook.com'||host==='www.facebook.com'||host==='fb.watch'){
       // Facebook embeds need the full URL but it's safely encoded
@@ -6892,7 +6892,8 @@ function handleVideo(){
   var isFB = rawUrl.indexOf('facebook.com')!==-1 || rawUrl.indexOf('fb.watch')!==-1;
   var source = isFB ? 'facebook' : 'youtube';
   var rec=_buildMediaRecord({mediaType:'video',name:title,mimeType:source,title:title,preacher:preacher,uploadedDate:new Date().toLocaleDateString()});
-  var item={type:'video',url:embedUrl,originalUrl:rawUrl,title:title,preacher:preacher,church:rec.church,churchId:rec.churchId,dist:rec.dist,postedBy:rec.postedBy,postedAt:rec.postedAt,postedAtMs:rec.postedAtMs,uploadedDate:rec.uploadedDate,source:source};
+  var _ckv='ck_'+Date.now()+'_'+Math.random().toString(36).slice(2);
+  var item={type:'video',url:embedUrl,originalUrl:rawUrl,title:title,preacher:preacher,church:rec.church,churchId:rec.churchId,dist:rec.dist,postedBy:rec.postedBy,postedAt:rec.postedAt,postedAtMs:rec.postedAtMs,uploadedDate:rec.uploadedDate,source:source,_delKey:_ckv};
   mediaItems.push(item);
   if(GS_CONFIGURED){_gsPost('addDoc','media',item).catch(function(){});}
   var saved=JSON.parse(localStorage.getItem('sda-media-cloud')||'[]');
