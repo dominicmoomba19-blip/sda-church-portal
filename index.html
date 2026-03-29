@@ -4224,26 +4224,12 @@ function _checkGSApproval(u, p, localFound){
     .then(function(){ if(loginBtn){loginBtn.disabled=false;loginBtn.textContent='Login';} });
 }
 function _completeLogin(found){
-  // Ensure churchId is always set
   if(!found.churchId&&found.church){
     found.churchId=makeChurchId(found.church);
+    const allA=LS.get('sda-admins',[]);
+    const idx=allA.findIndex(a=>a.u===found.u);
+    if(idx>=0){allA[idx].churchId=found.churchId;LS.set('sda-admins',allA);}
   }
-  // Ensure distName, conf, distId are present — fill from local record if missing
-  if(!found.distName||!found.conf){
-    const localAll=LS.get('sda-admins',[]);
-    const local=localAll.find(a=>a.u===found.u);
-    if(local){
-      if(!found.distName)found.distName=local.distName||'';
-      if(!found.conf)found.conf=local.conf||'';
-      if(!found.distId)found.distId=local.distId||'';
-      if(!found.n)found.n=local.n||found.u;
-    }
-  }
-  // Sync the completed record back to localStorage
-  const allA=LS.get('sda-admins',[]);
-  const idx=allA.findIndex(a=>a.u===found.u);
-  if(idx>=0){allA[idx]=Object.assign(allA[idx],found);LS.set('sda-admins',allA);}
-  else{allA.push(found);LS.set('sda-admins',allA);}
   if(adminExpired(found)){setErr('login-err','This admin account expired. Please subscribe again to renew.');return;}
   const dl=adminDaysLeft(found);
   openDash(found);
@@ -5917,22 +5903,31 @@ function confirmDelMedia(dbId,el,type){
     const idbIdx   = mediaItems.findIndex(m => m.dbId !== undefined && m.dbId === dbId);
     const gsIdx    = mediaItems.findIndex(m => m._gsId && m._gsId === dbId);
 
-    // Shared helper: delete from Google Sheets by _gsId, or fall back to URL lookup
+    // Shared helper: delete from Google Sheets and/or Supabase
     function _gsDelete(item) {
-      if (!GS_CONFIGURED) return;
-      if (item._gsId) {
-        _gsPost('deleteDoc', 'media', {}, {id: item._gsId}).catch(function(){});
-      } else {
-        var _delUrl = item.downloadURL || item.url || '';
-        if (!_delUrl) return;
-        _gsGet('getDocs', 'media').then(function(res) {
-          var docs = (res && Array.isArray(res.docs)) ? res.docs : [];
-          var match = docs.find(function(d) {
-            var u = (d.data && (d.data.downloadURL || d.data.url || d.data.media_url)) || '';
-            return u === _delUrl;
-          });
-          if (match && match.id) _gsPost('deleteDoc', 'media', {}, {id: match.id}).catch(function(){});
-        }).catch(function(){});
+      var _delUrl = item.downloadURL || item.url || '';
+      // Google Sheets delete
+      if (GS_CONFIGURED) {
+        if (item._gsId) {
+          _gsPost('deleteDoc', 'media', {}, {id: item._gsId}).catch(function(){});
+        } else if (_delUrl) {
+          _gsGet('getDocs', 'media').then(function(res) {
+            var docs = (res && Array.isArray(res.docs)) ? res.docs : [];
+            var match = docs.find(function(d) {
+              var u = (d.data && (d.data.downloadURL || d.data.url || d.data.media_url)) || '';
+              return u === _delUrl;
+            });
+            if (match && match.id) _gsPost('deleteDoc', 'media', {}, {id: match.id}).catch(function(){});
+          }).catch(function(){});
+        }
+      }
+      // Supabase delete — by row id (sbId) or by media_url match
+      if (SUPABASE_CONFIGURED && supabaseClient) {
+        if (item.sbId) {
+          supabaseClient.from('Media').delete().eq('id', item.sbId).catch(function(){});
+        } else if (_delUrl) {
+          supabaseClient.from('Media').delete().eq('media_url', _delUrl).catch(function(){});
+        }
       }
     }
 
@@ -5993,21 +5988,17 @@ function renderPublicMedia(){
   const el=document.getElementById('pub-media-content');
   if(!el)return;
   const lbl=document.getElementById('media-church-lbl');
-  // If no church selected by member, fall back to admin's church if logged in
-  const effectiveChurchId = selectedChurchId ||
-    (currentAdmin ? (currentAdmin.churchId || makeChurchId(currentAdmin.church||'')) : null);
-  const effectiveChurchName = selectedChurch ||
-    (currentAdmin ? currentAdmin.church : null);
-  if(!effectiveChurchId){
+  if(!selectedChurchId){
     if(lbl)lbl.textContent='Photos & sermons from your church';
     el.innerHTML='<div class="empty"><span class="empty-ico">⛪</span><strong>Select your church first</strong><p>Pick your church from the top of the home screen to see media posted by your church admin.</p></div>';
     return;
   }
-  if(lbl)lbl.textContent='Photos & sermons from '+(effectiveChurchName||'your church');
+  if(lbl)lbl.textContent='Photos & sermons from '+(selectedChurch||'your church');
   // Fetch from Google Sheets for cross-device media, fall back to Supabase
   if(GS_CONFIGURED){
     el.innerHTML='<div style="text-align:center;padding:30px;color:var(--text3);font-size:13px">⏳ Loading media...</div>';
     _gsGet('getDocs','media').then(function(res){
+      // GS returns {ok:true, docs:[{id, data:{...}, ts}]} — extract the data objects
       var rawDocs=(res&&Array.isArray(res.docs))?res.docs:[];
       var rows=rawDocs.map(function(d){ return Object.assign({},d.data||d,{_gsId:d.id}); });
       var now2=Date.now();
@@ -6015,16 +6006,14 @@ function renderPublicMedia(){
       rows.forEach(function(m){
         // Normalise mediaType → type for old GS records
         if (!m.type && m.mediaType) { m.type = m.mediaType; }
-        // Handle expiresAt as either ms number or ISO string
-        var expMs = m.expiresAt ? (typeof m.expiresAt==='number' ? m.expiresAt : new Date(m.expiresAt).getTime()) : null;
-        if(expMs&&expMs<now2)return;
-        m.expiresAt = expMs; // normalise to number
+        if(m.expiresAt&&m.expiresAt<now2)return;
         var mUrl=m.downloadURL||m.url||'';
         if(!mUrl||existingUrls.has(mUrl))return;
         existingUrls.add(mUrl);
         mediaItems.push(Object.assign({},m,{url:mUrl,source:m.source||'cloudinary'}));
       });
-      _renderPublicMediaContent(effectiveChurchId, effectiveChurchName);
+      _renderPublicMediaContent();
+      // If GS returned nothing, try Supabase as fallback
       if(rows.length===0&&SUPABASE_CONFIGURED&&supabaseClient){
         supabaseClient.from('Media').select('*').then(function(r){
           if(r.error||!r.data||!r.data.length)return;
@@ -6037,10 +6026,11 @@ function renderPublicMedia(){
               dist:m.district||'',postedBy:m.posted_by||'',postedAt:m.posted_at||'',
               expiresAt:m.expires_at?new Date(m.expires_at).getTime():null,source:'supabase'});
           });
-          _renderPublicMediaContent(effectiveChurchId, effectiveChurchName);
+          _renderPublicMediaContent();
         }).catch(function(){});
       }
     }).catch(function(){
+      // GS failed entirely — go straight to Supabase
       if(SUPABASE_CONFIGURED&&supabaseClient){
         supabaseClient.from('Media').select('*').then(function(r){
           if(r.error||!r.data)return;
@@ -6053,13 +6043,13 @@ function renderPublicMedia(){
               dist:m.district||'',postedBy:m.posted_by||'',postedAt:m.posted_at||'',
               expiresAt:m.expires_at?new Date(m.expires_at).getTime():null,source:'supabase'});
           });
-          _renderPublicMediaContent(effectiveChurchId, effectiveChurchName);
-        }).catch(function(){_renderPublicMediaContent(effectiveChurchId, effectiveChurchName);});
-      } else { _renderPublicMediaContent(effectiveChurchId, effectiveChurchName); }
+          _renderPublicMediaContent();
+        }).catch(function(){_renderPublicMediaContent();});
+      } else { _renderPublicMediaContent(); }
     });
     return;
   }
-  _renderPublicMediaContent(effectiveChurchId, effectiveChurchName);
+  _renderPublicMediaContent();
 }
 
 // ── YouTube IFrame API: error-aware embed ─────────────────────────────────────
@@ -6139,26 +6129,18 @@ function _makeVideoButtons(item){
   row.appendChild(shareBtn);
   return row;
 }
-function _renderPublicMediaContent(effectiveChurchId, effectiveChurchName){
+function _renderPublicMediaContent(){
   const el=document.getElementById('pub-media-content');
   if(!el)return;
-  // Use passed-in values, fall back to globals, fall back to admin's church
-  const myChurchId = effectiveChurchId || selectedChurchId ||
-    (currentAdmin ? (currentAdmin.churchId || makeChurchId(currentAdmin.church||'')) : null);
-  const myChurchName = effectiveChurchName || selectedChurch ||
-    (currentAdmin ? currentAdmin.church : 'your church');
   const lbl=document.getElementById('media-church-lbl');
-  if(lbl)lbl.textContent='Photos & sermons from '+(myChurchName||'your church');
+  if(lbl)lbl.textContent='Photos & sermons from '+(selectedChurch||'your church');
+  const myChurchId=selectedChurchId;
   function mediaMatchesChurch(m){
     const mid=m.churchId||(m.church?makeChurchId(m.church):null);
-    return mid===myChurchId || (m.church && myChurchName && m.church===myChurchName);
+    return mid===myChurchId;
   }
   const now48=Date.now();
-  const notExpired=m=>{
-    if(!m.expiresAt) return true;
-    const expMs = typeof m.expiresAt==='number' ? m.expiresAt : new Date(m.expiresAt).getTime();
-    return expMs > now48;
-  };
+  const notExpired=m=>!m.expiresAt||m.expiresAt>now48;
   const photos=mediaItems.filter(m=>m.type==='photo'&&mediaMatchesChurch(m)&&notExpired(m));
   const audios=mediaItems.filter(m=>m.type==='audio'&&mediaMatchesChurch(m)&&notExpired(m));
   const videos=mediaItems.filter(m=>m.type==='video'&&mediaMatchesChurch(m)&&notExpired(m));
@@ -6237,7 +6219,7 @@ function _renderPublicMediaContent(effectiveChurchId, effectiveChurchName){
         player.onclick=function(){
           const vid=document.createElement('video');
           vid.controls=true;vid.autoplay=true;vid.src=capturedUrl2;vid.preload='auto';
-          vid.style.cssText='width:100%;border-radius:8px;display:block';
+          vid.style.cssText='width:100%;max-height:56vw;border-radius:8px;display:block;background:#000';
           this.replaceWith(vid);
         };
       }
@@ -6455,7 +6437,8 @@ async function loadPersistedMedia(){
             postedBy: m.posted_by || m.postedBy || '',
             postedAt: m.posted_at || m.postedAt || '',
             expiresAt: m.expires_at ? new Date(m.expires_at).getTime() : null,
-            source: 'supabase'
+            source: 'supabase',
+            sbId: m.id || m.sbId || null
           };
         }
         if (m.expiresAt && m.expiresAt < now2) return;
@@ -6475,7 +6458,9 @@ async function loadPersistedMedia(){
         // Sanitise token-like titles: if title has no spaces and is >60 chars it's likely
         // an access token or raw key accidentally stored as the title — replace it.
         if (m.title && m.title.length > 60 && !/\s/.test(m.title)) { m = Object.assign({}, m, { title: 'Untitled Video' }); }
-        mediaItems.push(Object.assign({}, m, { url: mUrl, source: m.source || 'cloudinary' }));
+        // Ensure every merged item has a _delKey so confirmDelMedia can locate and remove it
+        var _mergedKey = m._delKey || ('ck_merged_' + Date.now() + '_' + Math.random().toString(36).slice(2));
+        mediaItems.push(Object.assign({}, m, { url: mUrl, source: m.source || 'cloudinary', _delKey: _mergedKey }));
         added++;
       });
       return added;
