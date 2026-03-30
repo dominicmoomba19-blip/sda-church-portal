@@ -721,8 +721,9 @@ textarea.finp { resize:vertical; min-height:90px; }
 .sbdg { background:var(--card2); border:1px solid var(--bor2); border-radius:10px; padding:10px 13px; font-size:11.5px; color:var(--text2); line-height:1.5; }
 
 /* Filter tabs */
-.frow { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px; }
-.ftab { padding:7px 15px; border-radius:22px; border:1.5px solid var(--bor2); background:var(--card); color:var(--text2); font-size:12px; font-weight:600; cursor:pointer; transition:all .2s; letter-spacing:.2px; }
+.frow { display:flex; gap:6px; overflow-x:auto; margin-bottom:12px; padding-bottom:4px; scrollbar-width:none; -ms-overflow-style:none; }
+.frow::-webkit-scrollbar { display:none; }
+.ftab { padding:7px 15px; border-radius:22px; border:1.5px solid var(--bor2); background:var(--card); color:var(--text2); font-size:12px; font-weight:600; cursor:pointer; transition:all .2s; letter-spacing:.2px; white-space:nowrap; flex-shrink:0; }
 .ftab:hover { border-color:var(--bor); color:var(--text); }
 .ftab.on { background:linear-gradient(135deg,var(--em),var(--em2)); border-color:var(--em); color:#fff; box-shadow:0 2px 10px rgba(26,106,66,.35); }
 
@@ -944,29 +945,48 @@ textarea.finp { resize:vertical; min-height:90px; }
 .dlbtn:hover { filter:brightness(1.1); transform:translateY(-1px); }
 
 /* ═══════════════════════ RECIPES ═══════════════════════ */
-.rcard { background:var(--card); border:1px solid var(--bor2); border-radius:16px; overflow:hidden; margin-bottom:10px; box-shadow:var(--sh3); }
-.rban { height:70px; display:flex; align-items:center; justify-content:center; font-size:42px; }
-.rban.g1{background:linear-gradient(135deg,rgba(26,106,66,.35),rgba(26,138,80,.2))}
-.rban.g2{background:linear-gradient(135deg,rgba(122,80,16,.3),rgba(192,144,48,.2))}
-.rban.g3{background:linear-gradient(135deg,rgba(26,52,128,.3),rgba(30,80,192,.2))}
-.rban.g4{background:linear-gradient(135deg,rgba(90,20,20,.3),rgba(170,40,40,.2))}
-.rban.g5{background:linear-gradient(135deg,rgba(60,20,90,.3),rgba(120,40,160,.2))}
-.rban.g6{background:linear-gradient(135deg,rgba(20,80,80,.3),rgba(30,120,120,.2))}
-.rbod { padding:13px 15px; }
-.rbod h3 { font-family:'Playfair Display',serif; font-size:15px; font-weight:700; color:var(--text); margin-bottom:4px; }
-.rdsc { font-size:12px; color:var(--text2); margin-bottom:7px; line-height:1.55; }
-.rtags { display:flex; flex-wrap:wrap; gap:5px; margin-bottom:9px; }
-.xbtn { background:var(--card2); border:1px solid var(--bor2); color:var(--text2); padding:8px 15px; border-radius:9px; font-size:12px; font-weight:600; cursor:pointer; transition:all .2s; }
-.xbtn:hover { border-color:var(--bor); color:var(--text); }
-.rexp { display:none; margin-top:11px; }
+.rec-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px; }
+.rcard { background:var(--card); border:1px solid var(--bor2); border-radius:16px; overflow:hidden; box-shadow:var(--sh3); display:flex; flex-direction:column; }
+.rcard.full-w { grid-column:1/-1; flex-direction:row; }
+.rcard.full-w .rban { width:110px; height:auto; min-height:90px; flex-shrink:0; font-size:46px; border-radius:0; }
+.rcard.full-w .rbod { padding:12px 14px; }
+.rban { height:90px; display:flex; align-items:center; justify-content:center; font-size:46px; position:relative; flex-shrink:0; }
+.rban.rb-g  { background:linear-gradient(135deg,#1a6a42,#22a860); }
+.rban.rb-o  { background:linear-gradient(135deg,#b85c00,#f08030); }
+.rban.rb-y  { background:linear-gradient(135deg,#8a6a00,#d4a820); }
+.rban.rb-r  { background:linear-gradient(135deg,#8a1a1a,#cc3030); }
+.rban.rb-t  { background:linear-gradient(135deg,#006a6a,#20a8a8); }
+.rban.rb-br { background:linear-gradient(135deg,#5a3a10,#9a6a30); }
+.rban.rb-p  { background:linear-gradient(135deg,#5a1a8a,#9040cc); }
+.rban.rb-b  { background:linear-gradient(135deg,#1a3a8a,#3060cc); }
+.rban-cat { position:absolute; bottom:6px; left:7px; font-size:8.5px; font-weight:700; letter-spacing:.8px; text-transform:uppercase; background:rgba(0,0,0,.38); color:#fff; padding:2px 6px; border-radius:20px; }
+.rban-time { position:absolute; bottom:6px; right:7px; font-size:8.5px; font-weight:700; background:rgba(0,0,0,.38); color:#fff; padding:2px 6px; border-radius:20px; }
+.rbod { padding:10px 12px; flex:1; display:flex; flex-direction:column; }
+.rbod h3 { font-family:'Playfair Display',serif; font-size:13px; font-weight:700; color:var(--text); margin-bottom:3px; line-height:1.3; }
+.rdsc { font-size:11px; color:var(--text2); margin-bottom:6px; line-height:1.5; flex:1; }
+.rtags { display:flex; flex-wrap:wrap; gap:4px; margin-bottom:8px; }
+.rtag { font-size:9px; font-weight:700; padding:2px 6px; border-radius:20px; }
+.rtag-v { background:rgba(34,168,96,.14); color:#1a8a50; border:1px solid rgba(34,168,96,.22); }
+.rtag-z { background:rgba(212,168,32,.14); color:#a88000; border:1px solid rgba(212,168,32,.22); }
+.rtag-t { background:rgba(30,160,160,.14); color:#1a8080; border:1px solid rgba(30,160,160,.22); }
+.rtag-q { background:rgba(144,64,200,.14); color:#7030a0; border:1px solid rgba(144,64,200,.22); }
+[data-theme="light"] .rtag-v { color:#1a6a42; } [data-theme="light"] .rtag-z { color:#7a5a00; } [data-theme="light"] .rtag-t { color:#006060; } [data-theme="light"] .rtag-q { color:#6020a0; }
+.xbtn { background:var(--card2); border:1px solid var(--bor2); color:var(--text2); padding:7px 10px; border-radius:9px; font-size:11px; font-weight:600; cursor:pointer; transition:all .2s; width:100%; text-align:center; margin-top:auto; }
+.xbtn:active { opacity:.75; }
+.rexp { display:none; margin-top:10px; border-top:1px solid var(--bor3); padding-top:9px; }
 .rcard.xo .rexp { display:block; }
-.mttl { font-size:11px; color:var(--gold2); font-weight:700; letter-spacing:1px; text-transform:uppercase; margin-bottom:8px; }
-.mls { padding-left:18px; }
-.mls li { font-size:12.5px; color:var(--text2); line-height:1.7; margin-bottom:4px; }
-
+.mttl { font-size:10px; color:var(--gold2); font-weight:700; letter-spacing:1px; text-transform:uppercase; margin-bottom:7px; }
+.mls { padding-left:16px; margin:0; }
+.mls li { font-size:11.5px; color:var(--text2); line-height:1.7; margin-bottom:3px; }
+.rec-feat { background:linear-gradient(135deg,#1a6a42,#22a860); border-radius:14px; padding:14px 16px; margin-bottom:12px; color:#fff; display:flex; gap:13px; align-items:center; }
+.rec-feat-ico { font-size:38px; flex-shrink:0; }
+.rec-feat-body h3 { font-family:'Playfair Display',serif; font-size:15px; font-weight:700; margin-bottom:3px; }
+.rec-feat-body p { font-size:11.5px; opacity:.88; line-height:1.5; }
 /* ═══════════════════════ HEALTH TALKS ═══════════════════════ */
-.hsl { background:var(--card); border:1px solid var(--bor2); border-radius:18px; padding:20px 17px; margin-bottom:12px; box-shadow:var(--sh3); }
-.hsc { font-size:10px; color:var(--gold2); letter-spacing:1.8px; text-transform:uppercase; font-weight:700; margin-bottom:8px; }
+.hsl { background:var(--card); border:1px solid var(--bor2); border-radius:18px; padding:20px 17px; margin-bottom:12px; box-shadow:var(--sh3); position:relative; overflow:hidden; }
+.hsl::before { content:''; position:absolute; top:0; left:0; right:0; height:4px; background:linear-gradient(90deg,var(--em),var(--gold),var(--em2)); }
+.hsc { font-size:10px; color:var(--gold2); letter-spacing:1.8px; text-transform:uppercase; font-weight:700; margin-bottom:6px; display:flex; align-items:center; gap:7px; }
+.hsc-ico { font-size:18px; line-height:1; }
 .hst { font-family:'Playfair Display',serif; font-size:19px; font-weight:700; color:var(--text); margin-bottom:12px; line-height:1.3; }
 .hsb { font-size:13.5px; color:var(--text2); line-height:1.78; margin-bottom:12px; }
 .hsn { font-size:10.5px; color:var(--text3); font-weight:600; margin-bottom:10px; letter-spacing:.5px; }
@@ -1506,10 +1526,10 @@ textarea.finp { resize:vertical; min-height:90px; }
   <div class="acc-body" id="acc-body-resources">
     <div class="mg">
       <div class="mc tg" onclick="nav('library')"><span class="mi">📚</span><div class="mt">SDA Library</div><div class="md">25+ free books</div></div>
-      <div class="mc to" onclick="nav('recipes')"><span class="mi">🍽️</span><div class="mt">Recipes</div><div class="md">Healthy dishes</div></div>
+      <div class="mc to" onclick="nav('recipes')"><span class="mi">🍽️</span><div class="mt">Recipes</div><div class="md">45 healthy dishes</div></div>
       <div class="mc tb" onclick="nav('health')"><span class="mi">💚</span><div class="mt">Health Talks</div><div class="md">NEWSTART principles</div></div>
       <div class="mc tr" onclick="nav('stories')"><span class="mi">📖</span><div class="mt">Kids Stories</div><div class="md">Ages 3–12 · 25 stories</div></div>
-      <div class="mc tb" onclick="nav('about')"><span class="mi">ℹ️</span><div class="mt">About</div><div class="md">Conferences &amp; contact</div></div>
+      <div class="mc tb" onclick="nav('about')"><span class="mi">ℹ️</span><div class="mt">About</div><div class="md">Guide, conferences &amp; contact</div></div>
       <div class="mc tr" onclick="nav('resources')"><span class="mi">📂</span><div class="mt">Resources</div><div class="md">PDFs &amp; bulletins</div></div>
     </div>
   </div>
@@ -1561,7 +1581,32 @@ textarea.finp { resize:vertical; min-height:90px; }
 <!-- ABOUT -->
 <div class="page" id="page-about">
   <button class="bbtn" onclick="nav('home')">← Back</button>
-  <div class="pghdr"><div class="phi phi-b">ℹ️</div><div><h2>About SDA Zambia</h2><p>Conferences, districts &amp; contact info</p></div></div>
+  <div class="pghdr"><div class="phi phi-b">ℹ️</div><div><h2>About SDA Zambia</h2><p>Conferences, guide &amp; how to use this app</p></div></div>
+
+  <!-- Quick-access row -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:18px">
+    <a href="mailto:DominicMoomba19@gmail.com" style="text-decoration:none;background:var(--card2);border:1px solid var(--bor2);border-radius:13px;padding:12px 10px;display:flex;flex-direction:column;align-items:center;gap:5px">
+      <span style="font-size:24px">✉️</span>
+      <span style="font-size:11px;font-weight:700;color:var(--text)">Contact Us</span>
+      <span style="font-size:10px;color:var(--text3);text-align:center;line-height:1.4">Questions or problems</span>
+    </a>
+    <button onclick="document.getElementById('about-how-to').scrollIntoView({behavior:'smooth'})" style="background:var(--card2);border:1px solid var(--bor2);border-radius:13px;padding:12px 10px;display:flex;flex-direction:column;align-items:center;gap:5px;cursor:pointer;width:100%">
+      <span style="font-size:24px">📖</span>
+      <span style="font-size:11px;font-weight:700;color:var(--text)">How to Use</span>
+      <span style="font-size:10px;color:var(--text3);text-align:center;line-height:1.4">App guide &amp; rules</span>
+    </button>
+    <button onclick="document.getElementById('about-missing-church').scrollIntoView({behavior:'smooth'})" style="background:var(--card2);border:1px solid var(--bor2);border-radius:13px;padding:12px 10px;display:flex;flex-direction:column;align-items:center;gap:5px;cursor:pointer;width:100%">
+      <span style="font-size:24px">🔍</span>
+      <span style="font-size:11px;font-weight:700;color:var(--text)">Missing Church?</span>
+      <span style="font-size:10px;color:var(--text3);text-align:center;line-height:1.4">What to do</span>
+    </button>
+    <button onclick="document.getElementById('about-admin').scrollIntoView({behavior:'smooth'})" style="background:var(--card2);border:1px solid var(--bor2);border-radius:13px;padding:12px 10px;display:flex;flex-direction:column;align-items:center;gap:5px;cursor:pointer;width:100%">
+      <span style="font-size:24px">🔐</span>
+      <span style="font-size:11px;font-weight:700;color:var(--text)">Admin Guide</span>
+      <span style="font-size:10px;color:var(--text3);text-align:center;line-height:1.4">Roles &amp; responsibilities</span>
+    </button>
+  </div>
+
   <div class="sdiv" style="margin-bottom:13px">Northern Zambia Union Conference</div>
   <div class="conf-about">
     <div class="ca-flag" style="background:linear-gradient(90deg,#1a50cc,#4a9aff,#1a50cc)"></div>
@@ -1606,10 +1651,82 @@ textarea.finp { resize:vertical; min-height:90px; }
     🌐 <a href="https://adventist.org.zm" target="_blank" style="color:var(--gold2)">adventist.org.zm</a> &nbsp;·&nbsp;
     <a href="https://adventist.org" target="_blank" style="color:var(--gold2)">adventist.org (World Church)</a>
   </div>
-  <div style="margin-top:18px;padding:14px 16px;background:var(--bg2);border:1px solid var(--bor2);border-radius:14px;text-align:center">
+  <!-- HOW TO USE THIS APP -->
+  <div id="about-how-to" class="sdiv" style="margin-bottom:13px;margin-top:8px">How to Use This App</div>
+
+  <!-- For Church Members -->
+  <div class="dist-info-card" style="border-left:3px solid var(--em);margin-bottom:12px">
+    <strong>🙋 For Church Members</strong>
+    <div style="margin-bottom:8px">This app is free to use for any SDA member or visitor in Zambia. Here is how to get started:</div>
+    <div style="display:flex;flex-direction:column;gap:7px">
+      <div style="display:flex;gap:9px;align-items:flex-start"><span style="color:var(--gold);font-weight:700;min-width:20px">1.</span><span>Tap the <strong style="color:var(--text)">church icon</strong> at the top of the Home screen and select your conference, district, and church. This personalises the app to show your church's activities, media, and announcements.</span></div>
+      <div style="display:flex;gap:9px;align-items:flex-start"><span style="color:var(--gold);font-weight:700;min-width:20px">2.</span><span>Browse <strong style="color:var(--text)">Devotional</strong> for your daily scripture reading and reflection.</span></div>
+      <div style="display:flex;gap:9px;align-items:flex-start"><span style="color:var(--gold);font-weight:700;min-width:20px">3.</span><span>Visit <strong style="color:var(--text)">Activities</strong> to see upcoming programmes, events, and Sabbath school schedules posted by your church admin.</span></div>
+      <div style="display:flex;gap:9px;align-items:flex-start"><span style="color:var(--gold);font-weight:700;min-width:20px">4.</span><span>Open <strong style="color:var(--text)">Media</strong> to watch or listen to sermons and view photos shared by your church.</span></div>
+      <div style="display:flex;gap:9px;align-items:flex-start"><span style="color:var(--gold);font-weight:700;min-width:20px">5.</span><span>Use <strong style="color:var(--text)">Prayer</strong> to submit personal prayer requests. They go directly to your church prayer team.</span></div>
+      <div style="display:flex;gap:9px;align-items:flex-start"><span style="color:var(--gold);font-weight:700;min-width:20px">6.</span><span>The <strong style="color:var(--text)">Connect</strong> tab lets you find and join your local church community anonymously — no personal data is collected.</span></div>
+    </div>
+  </div>
+
+  <!-- For Church Admins -->
+  <div id="about-admin" class="dist-info-card" style="border-left:3px solid var(--gold);margin-bottom:12px">
+    <strong>🔐 For Church Admins</strong>
+    <div style="margin-bottom:8px">Church admins are trusted leaders appointed to manage content for their specific church. Admin access allows you to:</div>
+    <div style="display:flex;flex-direction:column;gap:7px">
+      <div style="display:flex;gap:9px;align-items:flex-start"><span style="color:var(--gold);font-weight:700;min-width:20px">✓</span><span>Upload and manage <strong style="color:var(--text)">photos, audio sermons, and video sermons</strong> for your church.</span></div>
+      <div style="display:flex;gap:9px;align-items:flex-start"><span style="color:var(--gold);font-weight:700;min-width:20px">✓</span><span>Post and edit <strong style="color:var(--text)">church activities and announcements</strong> visible to your members.</span></div>
+      <div style="display:flex;gap:9px;align-items:flex-start"><span style="color:var(--gold);font-weight:700;min-width:20px">✓</span><span>Review and respond to <strong style="color:var(--text)">prayer requests</strong> submitted by members of your church.</span></div>
+      <div style="display:flex;gap:9px;align-items:flex-start"><span style="color:var(--gold);font-weight:700;min-width:20px">✓</span><span>Manage your church's <strong style="color:var(--text)">live stream link</strong> so members can watch services remotely.</span></div>
+    </div>
+    <div style="margin-top:10px;padding:9px 11px;background:var(--bg2);border-radius:9px;font-size:11.5px;color:var(--text3);line-height:1.6">
+      ⚠️ <strong style="color:var(--text2)">Admin Responsibilities:</strong> Admins must only post content that is relevant to their church and appropriate for all ages. Uploading offensive, political, or misleading content may result in your admin access being revoked. All uploads are visible to your church members only.
+    </div>
+  </div>
+
+  <!-- Church not listed -->
+  <div id="about-missing-church" class="dist-info-card" style="border-left:3px solid var(--sapp);margin-bottom:12px">
+    <strong>🔍 Don't See Your Church?</strong>
+    <div style="margin-bottom:8px">The church list covers registered SDA churches across both Zambia Union Conferences. If your church is missing:</div>
+    <div style="display:flex;flex-direction:column;gap:7px">
+      <div style="display:flex;gap:9px;align-items:flex-start"><span style="color:var(--sapp);font-weight:700;min-width:20px">1.</span><span>Check that you have selected the correct <strong style="color:var(--text)">conference and district</strong> first — your church may be listed under a different district than expected.</span></div>
+      <div style="display:flex;gap:9px;align-items:flex-start"><span style="color:var(--sapp);font-weight:700;min-width:20px">2.</span><span>Try searching by a shorter version of your church name — some churches are listed without "SDA" or "Church" at the end.</span></div>
+      <div style="display:flex;gap:9px;align-items:flex-start"><span style="color:var(--sapp);font-weight:700;min-width:20px">3.</span><span>If your church is genuinely not listed, ask your church pastor or clerk to <strong style="color:var(--text)">apply for registration</strong> through the <em>Register a Church</em> option found in the Admin section.</span></div>
+      <div style="display:flex;gap:9px;align-items:flex-start"><span style="color:var(--sapp);font-weight:700;min-width:20px">4.</span><span>New church registrations are reviewed and approved by a conference-level superadmin. Once approved your church will appear in the list within 24 hours.</span></div>
+    </div>
+  </div>
+
+  <!-- Rules of Use -->
+  <div class="dist-info-card" style="border-left:3px solid var(--crim);margin-bottom:12px">
+    <strong>📋 Platform Rules</strong>
+    <div style="display:flex;flex-direction:column;gap:6px;margin-top:4px">
+      <div style="display:flex;gap:9px;align-items:flex-start"><span style="color:var(--crim);font-size:14px">•</span><span>This platform is for <strong style="color:var(--text)">Seventh-day Adventist churches in Zambia</strong> only. It is not a general social media platform.</span></div>
+      <div style="display:flex;gap:9px;align-items:flex-start"><span style="color:var(--crim);font-size:14px">•</span><span>All content posted must be <strong style="color:var(--text)">church-related, truthful, and respectful</strong>. No political, commercial, or offensive material is permitted.</span></div>
+      <div style="display:flex;gap:9px;align-items:flex-start"><span style="color:var(--crim);font-size:14px">•</span><span>Media uploads (photos, audio, video) are stored temporarily and may <strong style="color:var(--text)">expire after a set period</strong>. Admins should re-upload important content periodically.</span></div>
+      <div style="display:flex;gap:9px;align-items:flex-start"><span style="color:var(--crim);font-size:14px">•</span><span>The <strong style="color:var(--text)">Connect feature</strong> stores your church selection on your device only. No personal information is ever collected or shared.</span></div>
+      <div style="display:flex;gap:9px;align-items:flex-start"><span style="color:var(--crim);font-size:14px">•</span><span>Misuse of admin privileges will result in account suspension. Superadmins monitor all content across the platform.</span></div>
+    </div>
+  </div>
+
+  <!-- Tips -->
+  <div class="dist-info-card" style="margin-bottom:18px">
+    <strong>💡 Quick Tips</strong>
+    <div style="display:flex;flex-direction:column;gap:6px;margin-top:4px;font-size:11.5px">
+      <div style="display:flex;gap:9px"><span>🌙</span><span>Use the <strong style="color:var(--text)">Dark</strong> button in the nav bar to switch between light and dark mode.</span></div>
+      <div style="display:flex;gap:9px"><span>⛶</span><span>Tap the <strong style="color:var(--text)">Fit Screen</strong> button on any video to watch it in fullscreen.</span></div>
+      <div style="display:flex;gap:9px"><span>📶</span><span>Most content loads over your mobile data. Use Wi-Fi when watching videos to save data.</span></div>
+      <div style="display:flex;gap:9px"><span>🔄</span><span>If activities or media are not showing, pull down to refresh or re-select your church.</span></div>
+      <div style="display:flex;gap:9px"><span>🙏</span><span>Prayer requests are private — only your church admin can see them.</span></div>
+    </div>
+  </div>
+
+  <div style="margin-top:4px;padding:14px 16px;background:var(--bg2);border:1px solid var(--bor2);border-radius:14px;text-align:center">
     <div style="font-size:11px;letter-spacing:1.2px;color:var(--text3);text-transform:uppercase;margin-bottom:6px">Platform Creator</div>
     <div style="font-family:'Playfair Display',serif;font-size:16px;font-weight:700;color:var(--gold2);margin-bottom:3px">Thabo Moomba</div>
-    <div style="font-size:12px;color:var(--text3)">Cavendish University Zambia</div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:8px">Cavendish University Zambia</div>
+    <div style="font-size:11.5px;color:var(--text2);margin-bottom:4px">Questions or problems?</div>
+    <a href="mailto:DominicMoomba19@gmail.com" style="font-size:12.5px;font-weight:700;color:var(--gold2);text-decoration:none;display:inline-flex;align-items:center;gap:5px;background:var(--card);border:1px solid var(--bor2);padding:7px 14px;border-radius:22px">
+      ✉️ DominicMoomba19@gmail.com
+    </a>
   </div>
 </div>
 
@@ -2880,6 +2997,28 @@ const RECIPES=[
   {icon:'🍅',bn:'rb-r',t:'White Bean Shakshuka',d:'Spiced tomato and bean stew.',tags:['Vegan','25 min'],cat:'Mains',steps:['Fry onion and red pepper.','Add garlic, cumin, paprika, chilli.','Pour in crushed tomatoes.','Simmer 10 min.','Add white beans and serve with flatbread.']},
   {icon:'🌴',bn:'rb-y',t:'Tropical Fruit Salad',d:'Refreshing vitamin-rich dessert.',tags:['Vegan','10 min','No Cook'],cat:'Desserts',steps:['Chop mango, pineapple, papaya, banana.','Add passion fruit pulp.','Squeeze lime juice over fruits.','Add fresh mint leaves.','Toss gently and serve chilled.']},
   {icon:'🌊',bn:'rb-t',t:'Cucumber Mint Cooler',d:'Hydrating refreshing drink.',tags:['Vegan','5 min','Drink'],cat:'Drinks',steps:['Slice half a cucumber.','Add to jug with mint leaves.','Pour in 1 litre chilled water.','Add sliced lemon and ice.','Infuse 20 min and serve.']},
+  // ── NEW RECIPES ─────────────────────────────────────────────
+  {icon:'🍵',bn:'rb-t',t:'Zambian Chibwantu',d:'Traditional fermented maize drink.',tags:['Traditional','10 min','Drink'],cat:'Drinks',steps:['Soak 1 cup dried maize in water overnight.','Strain and grind coarsely.','Boil in 2 litres water 15 min.','Cool, add a pinch of bicarbonate soda.','Sweeten with honey and serve cold.']},
+  {icon:'🥜',bn:'rb-br',t:'Groundnut Soup (Ndiwo)',d:'Classic Zambian peanut vegetable soup.',tags:['Vegan','35 min','Traditional'],cat:'Soups',steps:['Roast and grind 1 cup groundnuts into smooth paste.','Boil 4 cups water with chopped onion and tomato.','Stir in groundnut paste until smooth.','Add chopped rape leaves or spinach.','Season with salt, simmer 10 min and serve.']},
+  {icon:'🌾',bn:'rb-y',t:'Samp & Beans (Chisebwa)',d:'Traditional maize and bean stew.',tags:['Vegan','60 min','Traditional'],cat:'Mains',steps:['Soak 1 cup samp and 1 cup sugar beans overnight.','Drain and boil together in fresh water until tender (45 min).','Fry onion and tomato separately.','Combine with beans, add salt and a drizzle of oil.','Serve as a side or main dish.']},
+  {icon:'🍆',bn:'rb-p',t:'Roasted Aubergine Dip',d:'Smoky plant-based dip with African spices.',tags:['Vegan','30 min','Quick'],cat:'Snacks',steps:['Pierce 2 aubergines and roast directly over flame until charred.','Peel and scoop flesh into bowl.','Mash with 2 garlic cloves, lemon juice, olive oil.','Add ground cumin, coriander, chilli flakes, salt.','Serve with flatbread or vegetable sticks.']},
+  {icon:'🌰',bn:'rb-br',t:'Roasted Groundnut Brittle',d:'Traditional sweet snack — no added sugar.',tags:['Vegan','20 min','Snack'],cat:'Snacks',steps:['Dry-roast 2 cups raw groundnuts in a pan until golden.','Drizzle 3 tbsp honey and stir quickly over heat.','Add a pinch of salt and cinnamon.','Pour onto baking paper and flatten.','Cool completely then break into pieces.']},
+  {icon:'🥬',bn:'rb-g',t:'Rape & Tomato Stir-Fry',d:'Everyday Zambian leafy green side.',tags:['Vegan','10 min','Traditional'],cat:'Mains',steps:['Wash and roughly chop 1 large bunch rape leaves.','Fry diced onion in a little oil until soft.','Add 2 chopped tomatoes and cook 3 min.','Add rape leaves and stir-fry 5 min.','Season with salt and a squeeze of lemon.']},
+  {icon:'🍌',bn:'rb-y',t:'Baked Plantain with Cinnamon',d:'Naturally sweet healthy dessert.',tags:['Vegan','20 min','Quick'],cat:'Desserts',steps:['Slice 2 ripe plantains lengthwise.','Brush with coconut oil and dust with cinnamon.','Bake 200°C for 15 min until caramelised.','Drizzle with a little honey.','Serve warm with a dollop of natural yoghurt.']},
+  {icon:'🫙',bn:'rb-t',t:'Overnight Chia Pudding',d:'No-cook protein-rich breakfast.',tags:['Vegan','5 min','Breakfast'],cat:'Breakfast',steps:['Mix 3 tbsp chia seeds with 1 cup plant milk.','Add ½ tsp vanilla and 1 tbsp maple syrup.','Stir well and refrigerate overnight.','In the morning top with sliced mango and coconut flakes.','Add a handful of granola for crunch.']},
+  {icon:'🥣',bn:'rb-o',t:'Mealie Meal Porridge Deluxe',d:'Upgraded Zambian breakfast staple.',tags:['Vegan','15 min','Breakfast','Traditional'],cat:'Breakfast',steps:['Bring 2 cups water to boil with a pinch of salt.','Slowly whisk in ½ cup fine mealie meal.','Stir continuously 8 min until smooth and thick.','Stir in 1 tbsp peanut butter and ½ tsp cinnamon.','Top with sliced banana and a drizzle of honey.']},
+  {icon:'🍋',bn:'rb-y',t:'Tamarind Lemonade',d:'Tangy African refresher.',tags:['Vegan','10 min','Drink'],cat:'Drinks',steps:['Dissolve 2 tbsp tamarind paste in 1 cup warm water.','Strain through a sieve.','Add juice of 2 lemons and 2 tbsp honey.','Top up with 1 litre cold water and ice.','Garnish with fresh mint and lemon slices.']},
+  {icon:'🫛',bn:'rb-g',t:'Spiced Green Lentil Dal',d:'Indian-inspired protein powerhouse.',tags:['Vegan','30 min'],cat:'Mains',steps:['Rinse 1 cup green lentils and simmer in 3 cups water 20 min.','Fry onion, garlic, ginger in oil until golden.','Add 1 tsp each turmeric, cumin, garam masala.','Add diced tomatoes and cook 5 min.','Combine with lentils, season and serve over rice.']},
+  {icon:'🥙',bn:'rb-r',t:'Spicy Bean Tacos',d:'Smoky chipotle bean filling.',tags:['Vegan','15 min','Quick'],cat:'Mains',steps:['Drain and rinse 1 can kidney beans.','Fry onion, garlic, and red pepper in oil.','Add beans with 1 tsp each cumin, paprika, chilli.','Mash slightly and cook 5 min.','Serve in warm tortillas with shredded cabbage and avocado.']},
+  {icon:'🍚',bn:'rb-t',t:'Coconut Rice with Mango Salsa',d:'Fragrant island-style rice dish.',tags:['Vegan','30 min'],cat:'Mains',steps:['Cook 1½ cups rice in coconut milk instead of water.','Add a pinch of salt and cardamom.','Dice 1 mango, ½ red onion, and fresh coriander.','Mix with lime juice and chilli for salsa.','Serve coconut rice topped generously with mango salsa.']},
+  {icon:'🧆',bn:'rb-br',t:'Chickpea Fritters',d:'Crispy protein-rich street-style snack.',tags:['Vegan','20 min'],cat:'Snacks',steps:['Mash 1 can drained chickpeas until chunky.','Mix in ½ cup breadcrumbs, garlic, cumin, parsley, salt.','Form into small flat patties.','Pan-fry in a little olive oil 3 min each side until golden.','Serve with hummus and sliced tomatoes.']},
+  {icon:'🍊',bn:'rb-o',t:'Carrot & Orange Smoothie',d:'Immunity-boosting morning drink.',tags:['Vegan','5 min','Quick','Drink'],cat:'Drinks',steps:['Juice 3 large carrots or use ½ cup carrot juice.','Blend with juice of 2 oranges.','Add ½ tsp fresh grated ginger.','Add ½ cup water and a few ice cubes.','Blend until smooth and drink immediately.']},
+  {icon:'🫚',bn:'rb-g',t:'Moringa Soup',d:'Superfood soup from Zambian gardens.',tags:['Vegan','20 min','Traditional'],cat:'Soups',steps:['Strip fresh moringa leaves from stems (1 cup).','Fry onion and garlic in oil.','Add diced tomato and cook 3 min.','Pour in 3 cups broth or water.','Add moringa leaves last 3 min. Season and serve with nshima.']},
+  {icon:'🍫',bn:'rb-br',t:'Peanut Butter Energy Balls',d:'No-bake high-energy snack.',tags:['Vegan','10 min','Quick','Snack'],cat:'Snacks',steps:['Mix 1 cup rolled oats with ½ cup peanut butter.','Add 3 tbsp honey, 2 tbsp ground flaxseed.','Add ¼ cup dark chocolate chips or raisins.','Roll into small balls with damp hands.','Refrigerate 30 min before eating. Store up to 1 week.']},
+  {icon:'🥦',bn:'rb-g',t:'African Peanut & Vegetable Stew',d:'Rich nourishing one-pot meal.',tags:['Vegan','40 min'],cat:'Mains',steps:['Fry onion, garlic, and ginger in oil.','Add 1 tsp each cumin, coriander, paprika.','Add diced sweet potato, carrots, and 1 can tomatoes.','Stir in 3 tbsp peanut butter and 3 cups broth.','Simmer 25 min, finish with spinach and lime juice.']},
+  {icon:'🌱',bn:'rb-t',t:'Detox Green Smoothie',d:'Cleansing morning blend.',tags:['Vegan','5 min','Breakfast','Quick'],cat:'Breakfast',steps:['Add 1 cup spinach or moringa to blender.','Add 1 banana, ½ cucumber.','Add 1 cup coconut water and juice of 1 lime.','Optional: 1 tsp spirulina powder.','Blend until silky smooth and drink immediately.']},
+  {icon:'🫐',bn:'rb-p',t:'Mixed Berry Overnight Oats',d:'Colourful prep-ahead breakfast.',tags:['Vegan','5 min','Breakfast'],cat:'Breakfast',steps:['Combine ½ cup rolled oats with 1 cup plant milk.','Add 1 tbsp honey and ½ tsp cinnamon.','Refrigerate overnight in a jar.','In the morning top with fresh or frozen berries.','Add crushed nuts and a spoon of peanut butter.']},
+  {icon:'🥧',bn:'rb-y',t:'Sweet Potato Pudding',d:'Naturally sweet Zambian-inspired dessert.',tags:['Vegan','40 min','Traditional'],cat:'Desserts',steps:['Bake 2 sweet potatoes until very soft.','Scoop flesh and blend with coconut milk until smooth.','Add 2 tbsp honey, 1 tsp cinnamon, ¼ tsp nutmeg.','Pour into small bowls and refrigerate 1 hour.','Top with toasted coconut flakes and serve cold.']},
 ];
 const HEALTH=[
   // ── NUTRITION ──────────────────────────────────────────────────────────────
@@ -5155,15 +5294,46 @@ function renderRec(){
   let list=recF==='All'?RECIPES:RECIPES.filter(r=>r.cat===recF);
   if(q)list=list.filter(r=>(r.t+' '+r.d+' '+(r.tags||[]).join(' ')).toLowerCase().includes(q));
   if(!list.length){document.getElementById('rec-list').innerHTML='<div class="empty"><span class="empty-ico">🍽️</span><strong>No recipes found</strong><p>Try a different search term or category.</p></div>';return;}
-  document.getElementById('rec-list').innerHTML=list.map((r,i)=>`
-    <div class="rcard" id="rc${i}">
-      <div class="rban ${r.bn}">${r.icon}</div>
-      <div class="rbod"><h3>${e(r.t)}</h3><div class="rdsc">${e(r.d)}</div>
-        <div class="rtags">${r.tags.map(t=>`<span class="tag-g">${e(t)}</span>`).join('')}</div>
+  // Tag colour helper
+  function _rtc(tag){
+    const t=tag.toLowerCase();
+    if(t==='traditional'||t==='zambian')return 'rtag-z';
+    if(t==='vegan'||t==='plant-based')return 'rtag-v';
+    if(t.includes('min')||t==='quick'||t==='no cook')return 'rtag-t';
+    return 'rtag-q';
+  }
+  // Time tag extraction
+  function _time(tags){return (tags.find(t=>/\d+\s*min/.test(t))||'');}
+  // Build featured recipe banner (first in list)
+  const feat=list[0];
+  let html=`<div class="rec-feat">
+    <div class="rec-feat-ico">${feat.icon}</div>
+    <div class="rec-feat-body">
+      <h3>${e(feat.t)}</h3>
+      <p>${e(feat.d)} &nbsp;·&nbsp; ${e(feat.cat)}${_time(feat.tags)?' · '+e(_time(feat.tags)):''}</p>
+    </div>
+  </div>`;
+  html+=`<div class="rec-grid">`;
+  list.forEach((r,i)=>{
+    const timeTag=_time(r.tags);
+    const isWide=i===0; // first card spans full width
+    html+=`<div class="rcard${isWide?' full-w':''}" id="rc${i}">
+      <div class="rban ${r.bn}">
+        ${r.icon}
+        <span class="rban-cat">${e(r.cat)}</span>
+        ${timeTag?`<span class="rban-time">⏱ ${e(timeTag)}</span>`:''}
+      </div>
+      <div class="rbod">
+        <h3>${e(r.t)}</h3>
+        <div class="rdsc">${e(r.d)}</div>
+        <div class="rtags">${r.tags.map(t=>`<span class="rtag ${_rtc(t)}">${e(t)}</span>`).join('')}</div>
         <button class="xbtn" onclick="togRec('rc${i}',this)">▼ View Method</button>
         <div class="rexp"><div class="mttl">Method</div><ol class="mls">${r.steps.map(s=>`<li>${e(s)}</li>`).join('')}</ol></div>
       </div>
-    </div>`).join('');
+    </div>`;
+  });
+  html+=`</div>`;
+  document.getElementById('rec-list').innerHTML=html;
 }
 function setRecF(c){recF=c;renderRec()}
 function togRec(id,btn){const o=document.getElementById(id).classList.toggle('xo');btn.textContent=o?'▲ Hide Method':'▼ View Method'}
@@ -5201,7 +5371,7 @@ function renderHealth(){
   _hFiltered=filtered;
   const sub=document.getElementById('health-sub');
   if(!filtered.length){
-    document.getElementById('hsc').textContent='';
+    document.getElementById('hsc').innerHTML='';
     document.getElementById('hst').textContent='No results';
     document.getElementById('hsb').textContent='Try a different search term or category.';
     document.getElementById('hsn').textContent='';
@@ -5211,7 +5381,10 @@ function renderHealth(){
   }
   if(hIdx>=filtered.length)hIdx=0;
   const h=filtered[hIdx];
-  document.getElementById('hsc').textContent=h.c;
+  // Category icon map
+  const _hIco={'Nutrition':'🥗','Exercise':'🏃','Water':'💧','Sunlight':'☀️','Temperance':'🚭','Air':'🌬️','Rest':'😴','Trust in God':'🙏','Chronic Disease':'💊','Mental Health':'🧠',"Women's Health":'👩',"Children's Health":'👶','Zambia Health':'🇿🇲','General':'💡'};
+  const ico=_hIco[h.c]||'💚';
+  document.getElementById('hsc').innerHTML=`<span class="hsc-ico">${ico}</span>${e(h.c)}`;
   document.getElementById('hst').textContent=h.t;
   document.getElementById('hsb').textContent=h.b;
   document.getElementById('hsn').textContent='Talk '+(hIdx+1)+' of '+filtered.length+(_hSearch?' (search results)':hCat!=='All'?' ('+hCat+')':'');
@@ -6208,10 +6381,20 @@ function _renderPublicMediaContent(){
       const isFB = item.source==='facebook' || (item.url&&item.url.includes('facebook.com/plugins/video'));
       const player=document.createElement('div');
       if(isYT||isFB){
-        player.style.cssText='position:relative;width:100%;padding-top:56.25%;margin-top:8px;border-radius:8px;overflow:hidden;background:#000';
+        const playerWrap=document.createElement('div');
+        playerWrap.style.cssText='position:relative;width:100%;padding-top:56.25%;margin-top:8px;border-radius:8px;overflow:hidden;background:#000';
         const _ytId1=_ytIdFromEmbed(item.url);
-        if(isYT&&_ytId1){_makeYTEmbed(player,_ytId1);}
-        else{player.innerHTML='<iframe src="'+item.url+'" style="position:absolute;top:0;left:0;width:100%;height:100%;border:none" allowfullscreen loading="lazy"></iframe>';}
+        if(isYT&&_ytId1){_makeYTEmbed(playerWrap,_ytId1);}
+        else{playerWrap.innerHTML='<iframe src="'+item.url+'" style="position:absolute;top:0;left:0;width:100%;height:100%;border:none" allowfullscreen loading="lazy"></iframe>';}
+        // Fit-screen button overlay
+        const _fsBtn=document.createElement('button');
+        _fsBtn.title='Fit Screen';
+        _fsBtn.innerHTML='⛶';
+        _fsBtn.style.cssText='position:absolute;top:6px;right:6px;z-index:10;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:6px;font-size:16px;padding:4px 7px;cursor:pointer;line-height:1';
+        _fsBtn.onclick=function(e){e.stopPropagation();if(playerWrap.requestFullscreen){playerWrap.requestFullscreen();}else if(playerWrap.webkitRequestFullscreen){playerWrap.webkitRequestFullscreen();}};
+        playerWrap.appendChild(_fsBtn);
+        player.style.cssText='width:100%;margin-top:8px';
+        player.appendChild(playerWrap);
       } else {
         const capturedUrl2=item.url;
         player.style.cssText='width:100%;background:#111;border-radius:8px;overflow:hidden;cursor:pointer;position:relative;min-height:80px;display:flex;align-items:center;justify-content:center;margin-top:6px';
@@ -6220,7 +6403,14 @@ function _renderPublicMediaContent(){
           const vid=document.createElement('video');
           vid.controls=true;vid.autoplay=true;vid.src=capturedUrl2;vid.preload='auto';
           vid.style.cssText='width:100%;max-height:56vw;border-radius:8px;display:block;background:#000';
-          this.replaceWith(vid);
+          // Fit-screen button for local video
+          const _vWrap=document.createElement('div');_vWrap.style.cssText='position:relative;width:100%';
+          const _vfsBtn=document.createElement('button');
+          _vfsBtn.title='Fit Screen';_vfsBtn.innerHTML='⛶';
+          _vfsBtn.style.cssText='position:absolute;top:6px;right:6px;z-index:10;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:6px;font-size:16px;padding:4px 7px;cursor:pointer;line-height:1';
+          _vfsBtn.onclick=function(e){e.stopPropagation();if(vid.requestFullscreen){vid.requestFullscreen();}else if(vid.webkitEnterFullscreen){vid.webkitEnterFullscreen();}};
+          _vWrap.appendChild(vid);_vWrap.appendChild(_vfsBtn);
+          this.replaceWith(_vWrap);
         };
       }
       div.append(h4,meta,player);
@@ -6353,6 +6543,12 @@ function renderAdminMediaPanels(){
           _adIfr.setAttribute('allowfullscreen','');_adIfr.setAttribute('loading','lazy');
           _adWrap.appendChild(_adIfr);
         }
+        // Fit-screen button overlay for admin embed player
+        const _adFsBtn=document.createElement('button');
+        _adFsBtn.title='Fit Screen';_adFsBtn.innerHTML='⛶';
+        _adFsBtn.style.cssText='position:absolute;top:6px;right:6px;z-index:10;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:6px;font-size:16px;padding:4px 7px;cursor:pointer;line-height:1';
+        _adFsBtn.onclick=function(e){e.stopPropagation();if(_adWrap.requestFullscreen){_adWrap.requestFullscreen();}else if(_adWrap.webkitRequestFullscreen){_adWrap.webkitRequestFullscreen();}};
+        _adWrap.appendChild(_adFsBtn);
         div.appendChild(_adWrap);
       } else {
         const _adThumb=document.createElement('div');
@@ -6368,8 +6564,15 @@ function renderAdminMediaPanels(){
         div.querySelector('.vid-thumb').onclick=function(){
           const vid=document.createElement('video');
           vid.controls=true;vid.autoplay=true;vid.src=capturedVUrl;vid.preload='auto';
-          vid.style.cssText='width:100%;border-radius:8px;display:block;margin-top:6px';
-          this.replaceWith(vid);
+          vid.style.cssText='width:100%;max-height:56vw;border-radius:8px;display:block;margin-top:6px;background:#000';
+          // Fit-screen button for admin local video
+          const _avWrap=document.createElement('div');_avWrap.style.cssText='position:relative;width:100%;margin-top:6px';
+          const _avFsBtn=document.createElement('button');
+          _avFsBtn.title='Fit Screen';_avFsBtn.innerHTML='⛶';
+          _avFsBtn.style.cssText='position:absolute;top:6px;right:6px;z-index:10;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:6px;font-size:16px;padding:4px 7px;cursor:pointer;line-height:1';
+          _avFsBtn.onclick=function(e){e.stopPropagation();if(vid.requestFullscreen){vid.requestFullscreen();}else if(vid.webkitEnterFullscreen){vid.webkitEnterFullscreen();}};
+          _avWrap.appendChild(vid);_avWrap.appendChild(_avFsBtn);
+          this.replaceWith(_avWrap);
         };
       }
       const _admBtns = _makeVideoButtons(item);
