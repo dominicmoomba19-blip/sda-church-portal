@@ -750,6 +750,81 @@ textarea.finp { resize:vertical; min-height:90px; }
 .pg-footer::before { content:''; position:absolute; top:0; left:50%; transform:translateX(-50%); width:60%; height:1px; background:linear-gradient(90deg,transparent,var(--bor),var(--gold2),var(--bor),transparent); }
 .pg-footer em { font-family:'Cormorant Garamond',serif; font-style:italic; font-size:15px; color:var(--text2); display:block; margin-bottom:6px; letter-spacing:.1px; }
 
+/* ── PARALLAX DIVIDER ───────────────────────────────────── */
+.plx-wrap { position:relative; height:220px; margin:22px -16px; overflow:hidden; border-radius:0; }
+.plx-bg {
+  position:absolute; inset:-60px 0; z-index:0;
+  background:
+    radial-gradient(ellipse 80% 60% at 50% 40%, rgba(218,168,64,.13) 0%, transparent 70%),
+    radial-gradient(ellipse 60% 80% at 20% 80%, rgba(26,122,80,.18) 0%, transparent 60%),
+    radial-gradient(ellipse 70% 60% at 80% 20%, rgba(26,71,49,.25) 0%, transparent 65%),
+    linear-gradient(165deg, #0d1f15 0%, #1a2e1e 35%, #0f1a12 60%, #1c3525 100%);
+  will-change: transform;
+}
+.plx-bg::before {
+  content:'';
+  position:absolute; inset:0;
+  background-image:
+    radial-gradient(circle at 15% 85%, rgba(218,168,64,.06) 0%, transparent 40%),
+    radial-gradient(circle at 85% 15%, rgba(48,228,122,.05) 0%, transparent 40%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60'%3E%3Ccircle cx='30' cy='30' r='.8' fill='rgba(255,255,255,.04)'/%3E%3Ccircle cx='10' cy='10' r='.5' fill='rgba(255,255,255,.03)'/%3E%3Ccircle cx='50' cy='50' r='.6' fill='rgba(255,255,255,.03)'/%3E%3C/svg%3E");
+  background-size: auto, auto, 60px 60px;
+}
+.plx-overlay {
+  position:absolute; inset:0; z-index:1;
+  background:linear-gradient(180deg,
+    rgba(var(--page-rgb,13,25,18),.55) 0%,
+    transparent 30%,
+    transparent 70%,
+    rgba(var(--page-rgb,13,25,18),.55) 100%);
+}
+[data-theme="light"] .plx-bg {
+  background:
+    radial-gradient(ellipse 80% 60% at 50% 40%, rgba(192,144,48,.12) 0%, transparent 70%),
+    radial-gradient(ellipse 60% 80% at 20% 80%, rgba(26,100,60,.15) 0%, transparent 60%),
+    linear-gradient(165deg, #e8f0e9 0%, #d4e8d8 35%, #c8dfc9 60%, #d8ead8 100%);
+}
+[data-theme="light"] .plx-overlay {
+  background:linear-gradient(180deg,
+    rgba(240,247,241,.6) 0%, transparent 30%, transparent 70%, rgba(240,247,241,.6) 100%);
+}
+.plx-content {
+  position:absolute; inset:0; z-index:2;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  text-align:center; padding:20px;
+  pointer-events:none;
+}
+.plx-logo-ring {
+  width:64px; height:64px;
+  border-radius:50%;
+  background:rgba(218,168,64,.08);
+  border:1.5px solid rgba(218,168,64,.25);
+  display:flex; align-items:center; justify-content:center;
+  margin-bottom:14px;
+  box-shadow:0 0 28px rgba(218,168,64,.12), 0 4px 18px rgba(0,0,0,.4);
+  animation:plxLogoFloat 6s ease-in-out infinite;
+}
+.plx-logo-img { width:44px; height:44px; object-fit:contain; opacity:.9; filter:drop-shadow(0 2px 8px rgba(0,0,0,.4)); }
+.plx-verse {
+  font-family:'Cormorant Garamond',serif;
+  font-size:15px; font-style:italic; font-weight:600;
+  color:rgba(255,255,255,.88);
+  line-height:1.55; max-width:280px;
+  text-shadow:0 1px 12px rgba(0,0,0,.6);
+  letter-spacing:.2px;
+}
+[data-theme="light"] .plx-verse { color:rgba(20,50,30,.85); }
+.plx-ref {
+  margin-top:7px;
+  font-size:10px; font-weight:700; letter-spacing:2px; text-transform:uppercase;
+  color:var(--gold2); opacity:.8;
+  text-shadow:0 1px 8px rgba(0,0,0,.5);
+}
+@keyframes plxLogoFloat {
+  0%,100% { transform:translateY(0) scale(1); box-shadow:0 0 28px rgba(218,168,64,.12),0 4px 18px rgba(0,0,0,.4); }
+  50% { transform:translateY(-6px) scale(1.03); box-shadow:0 0 40px rgba(218,168,64,.22),0 10px 28px rgba(0,0,0,.35); }
+}
+
 /* ═══════════════════════ BOTTOM NAV ═══════════════════════ */
 .bnav { position:fixed; bottom:0; left:0; right:0; z-index:300; background:rgba(13,14,20,.96); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); display:flex; padding-bottom:env(safe-area-inset-bottom); border-top:1px solid rgba(255,255,255,.06); }
 .bnav::before { content:''; position:absolute; top:0; left:0; right:0; height:1px; background:linear-gradient(90deg,transparent 0%,rgba(218,168,64,.25) 30%,rgba(218,168,64,.45) 50%,rgba(218,168,64,.25) 70%,transparent 100%); }
@@ -1519,6 +1594,20 @@ textarea.finp { resize:vertical; min-height:90px; }
       <div class="mc te" id="tile-camp-register" onclick="campRegTileClick()" style="transition:opacity .2s"><span class="mi" id="tile-camp-icon">🔒</span><div class="mt">Church Events</div><div class="md" id="tile-camp-desc">Registration closed</div></div>
     </div>
   </div>
+
+  <!-- ── PARALLAX DIVIDER ───────────────────────────────── -->
+  <div class="plx-wrap" id="plx-divider" aria-hidden="true">
+    <div class="plx-bg" id="plx-bg"></div>
+    <div class="plx-overlay"></div>
+    <div class="plx-content">
+      <div class="plx-logo-ring">
+        <img src="" alt="" class="plx-logo-img" id="plx-logo-img">
+      </div>
+      <div class="plx-verse">"The Lord is my shepherd; I shall not want."</div>
+      <div class="plx-ref">— Psalm 23:1</div>
+    </div>
+  </div>
+
   <div class="slbl-acc" id="acc-resources" onclick="toggleAcc('resources')" role="button" aria-expanded="false">
     <span class="slbl-txt">📂 Resources</span>
     <span class="slbl-chev">▼</span>
@@ -7870,6 +7959,52 @@ self.addEventListener('fetch',ev=>{
 window.minTab=minTab;
 function toggleAcc(key){const btn=document.getElementById('acc-'+key);const body=document.getElementById('acc-body-'+key);if(!btn||!body)return;const opening=!body.classList.contains('open');btn.classList.toggle('open',opening);body.classList.toggle('open',opening);btn.setAttribute('aria-expanded',opening);try{var s=JSON.parse(localStorage.getItem('sda-acc-state')||'{}');s[key]=opening;localStorage.setItem('sda-acc-state',JSON.stringify(s));}catch(e){}}
 window.toggleAcc=toggleAcc;
+
+// ── PARALLAX SCROLL EFFECT ───────────────────────────────────
+(function(){
+  var plxBg = document.getElementById('plx-bg');
+  var plxWrap = document.getElementById('plx-divider');
+  // Copy logo from hero into parallax
+  var heroImg = document.querySelector('.hero-ico img');
+  var plxLogoImg = document.getElementById('plx-logo-img');
+  if(heroImg && plxLogoImg) plxLogoImg.src = heroImg.src;
+  if(!plxBg || !plxWrap) return;
+  var ticking = false;
+  function updateParallax() {
+    var rect = plxWrap.getBoundingClientRect();
+    var winH = window.innerHeight;
+    // Only animate when visible
+    if(rect.bottom < 0 || rect.top > winH) { ticking = false; return; }
+    // Progress: -1 (above viewport) to +1 (below viewport)
+    var progress = (winH/2 - (rect.top + rect.height/2)) / (winH/2 + rect.height/2);
+    var offset = progress * 40; // 40px max travel
+    plxBg.style.transform = 'translateY(' + offset + 'px)';
+    ticking = false;
+  }
+  var scrollEl = document.querySelector('.page.on') || window;
+  function onScroll() {
+    if(!ticking) { requestAnimationFrame(updateParallax); ticking = true; }
+  }
+  // Listen on the page container (SPA inner scroll) and window
+  document.addEventListener('scroll', onScroll, {passive:true});
+  window.addEventListener('scroll', onScroll, {passive:true});
+  // Re-attach when page changes (nav)
+  var _origNav = window.nav;
+  if(typeof _origNav === 'function') {
+    window.nav = function(p) {
+      _origNav(p);
+      setTimeout(function(){
+        var pg = document.getElementById('page-home');
+        if(pg) {
+          pg.addEventListener('scroll', onScroll, {passive:true});
+        }
+        updateParallax();
+      }, 50);
+    };
+    window.nav._isStub = _origNav._isStub;
+  }
+  updateParallax();
+})();
 (function(){try{var s=JSON.parse(localStorage.getItem('sda-acc-state')||'{}');['worship','church','resources'].forEach(function(k){if(s[k]===undefined)return;var b=document.getElementById('acc-'+k);var d=document.getElementById('acc-body-'+k);if(!b||!d)return;b.classList.toggle('open',s[k]);d.classList.toggle('open',s[k]);b.setAttribute('aria-expanded',s[k]);});}catch(e){}})();
 /* ── IIFE internals needed by v5 member system ── */
 window._LS=LS;window._toast=toast;window._setErr=setErr;window._addLog=addLog;
