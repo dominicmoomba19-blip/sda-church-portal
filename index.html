@@ -1585,7 +1585,7 @@ textarea.finp { resize:vertical; min-height:90px; }
 
   <!-- Quick-access row -->
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:18px">
-    <a href="mailto:DominicMoomba19@gmail.com" style="text-decoration:none;background:var(--card2);border:1px solid var(--bor2);border-radius:13px;padding:12px 10px;display:flex;flex-direction:column;align-items:center;gap:5px">
+    <a href="/cdn-cgi/l/email-protection#6622090b0f080f052b09090b0407575f26010b070f0a4805090b" style="text-decoration:none;background:var(--card2);border:1px solid var(--bor2);border-radius:13px;padding:12px 10px;display:flex;flex-direction:column;align-items:center;gap:5px">
       <span style="font-size:24px">✉️</span>
       <span style="font-size:11px;font-weight:700;color:var(--text)">Contact Us</span>
       <span style="font-size:10px;color:var(--text3);text-align:center;line-height:1.4">Questions or problems</span>
@@ -1724,8 +1724,8 @@ textarea.finp { resize:vertical; min-height:90px; }
     <div style="font-family:'Playfair Display',serif;font-size:16px;font-weight:700;color:var(--gold2);margin-bottom:3px">Thabo Moomba</div>
     <div style="font-size:12px;color:var(--text3);margin-bottom:8px">Cavendish University Zambia</div>
     <div style="font-size:11.5px;color:var(--text2);margin-bottom:4px">Questions or problems?</div>
-    <a href="mailto:DominicMoomba19@gmail.com" style="font-size:12.5px;font-weight:700;color:var(--gold2);text-decoration:none;display:inline-flex;align-items:center;gap:5px;background:var(--card);border:1px solid var(--bor2);padding:7px 14px;border-radius:22px">
-      ✉️ DominicMoomba19@gmail.com
+    <a href="/cdn-cgi/l/email-protection#bbffd4d6d2d5d2d8f6d4d4d6d9da8a82fbdcd6dad2d795d8d4d6" style="font-size:12.5px;font-weight:700;color:var(--gold2);text-decoration:none;display:inline-flex;align-items:center;gap:5px;background:var(--card);border:1px solid var(--bor2);padding:7px 14px;border-radius:22px">
+      ✉️ <span class="__cf_email__" data-cfemail="a0e4cfcdc9cec9c3edcfcfcdc2c19199e0c7cdc1c9cc8ec3cfcd">[email&#160;protected]</span>
     </a>
   </div>
 </div>
@@ -1874,6 +1874,7 @@ textarea.finp { resize:vertical; min-height:90px; }
       <div class="atabs">
         <button class="atab on" id="atab-l" onclick="swTab('l')">Login</button>
         <button class="atab" id="atab-s" onclick="swTab('s')">💳 Subscribe</button>
+        <button class="atab" id="atab-renew" onclick="swTab('renew')" style="color:var(--teal,#0d9488)">🔄 Renew</button>
       </div>
       <div id="af-l">
         <label class="flbl">Username</label>
@@ -1982,6 +1983,44 @@ textarea.finp { resize:vertical; min-height:90px; }
           ⚠️ Approval is manual and may take up to 24 hours.
         </div>
         <p style="text-align:center;margin-top:11px;font-size:11.5px;color:var(--text3)">Already have an account? <button onclick="swTab('l')" style="background:none;border:none;color:var(--gold2);font-size:11.5px;cursor:pointer;text-decoration:underline">Login</button></p>
+      </div>
+
+      <!-- ══ RENEWAL PANEL ══ -->
+      <div id="af-renew" style="display:none">
+        <div style="text-align:center;margin-bottom:16px">
+          <div style="font-size:32px;margin-bottom:6px">🔄</div>
+          <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:4px">Renew Your Admin Access</div>
+          <div style="font-size:12px;color:var(--text2);line-height:1.6">Your account has expired. Pay <strong style="color:var(--gold2)">500 Kwacha</strong> to renew for another <strong style="color:var(--gold2)">60 days</strong>. Your church data and settings will be kept.</div>
+        </div>
+        <div style="background:rgba(192,144,48,.08);border:1px solid rgba(192,144,48,.25);border-radius:14px;padding:14px 16px;margin-bottom:16px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <span style="font-size:12px;color:var(--text3)">💎 Renewal Fee</span>
+            <span style="font-size:16px;font-weight:700;color:var(--gold2)">500 Kwacha</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <span style="font-size:12px;color:var(--text3)">📲 Send To</span>
+            <span style="font-size:14px;font-weight:700;color:var(--em3);letter-spacing:1px">0963684182</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:12px;color:var(--text3)">⏳ Duration</span>
+            <span style="font-size:13px;font-weight:600;color:var(--text2)">60 Days</span>
+          </div>
+        </div>
+        <label class="flbl">Your Username</label>
+        <input class="finp" id="renew-user" type="text" placeholder="Your username" autocomplete="username" style="background:rgba(13,148,136,.06);border-color:rgba(13,148,136,.3)">
+        <div style="font-size:10.5px;color:var(--text3);margin-bottom:10px;margin-top:-6px;line-height:1.5">🔒 Pre-filled from your login attempt. You can edit if needed.</div>
+        <label class="flbl">Your Password</label>
+        <input class="finp" id="renew-pw" type="password" placeholder="Your existing password" autocomplete="current-password">
+        <label class="flbl">Transaction / Reference Number <span style="color:var(--text3);font-size:9px;text-transform:none">(from your payment)</span></label>
+        <input class="finp" id="renew-txn" type="text" placeholder="e.g. MP2502131234">
+        <label class="flbl">Phone Number Used to Pay</label>
+        <input class="finp" id="renew-phone" type="tel" placeholder="e.g. 0977123456">
+        <div class="errbox" id="renew-err"></div>
+        <button class="btn btnf" style="margin-top:14px;background:rgba(13,148,136,.15);color:var(--teal,#0d9488);border:1px solid rgba(13,148,136,.35);font-weight:700" onclick="submitRenewal()">🔄 Submit Renewal Request</button>
+        <div style="font-size:10.5px;color:var(--text3);text-align:center;margin-top:10px;line-height:1.5">
+          ⚠️ Approval is manual and may take up to 24 hours.
+        </div>
+        <p style="text-align:center;margin-top:11px;font-size:11.5px;color:var(--text3)">Back to <button onclick="swTab('l')" style="background:none;border:none;color:var(--gold2);font-size:11.5px;cursor:pointer;text-decoration:underline">Login</button></p>
       </div>
     </div>
   </div>
@@ -2728,7 +2767,7 @@ textarea.finp { resize:vertical; min-height:90px; }
   <button class="bni bni-adm" id="admbtn" onclick="nav('admin')"><span class="bi">🔐</span><span id="adm-lbl">Admin</span></button>
 </nav>
 
-<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ══════════════════════════════════════════════════════════════════════════════
 // SDA Portal — private application scope
 // All state variables are enclosed here; only event-handler functions are
@@ -4185,7 +4224,7 @@ function memSaveChurch(){
 /* ===== ADMIN AUTH ===== */
 function setErr(id,msg){const el=document.getElementById(id);if(el){el.textContent=msg;el.classList.toggle('on',!!msg)}}
 function swTab(t){
-  ['l','r','s'].forEach(tab=>{
+  ['l','r','s','renew'].forEach(tab=>{
     const el=document.getElementById('af-'+tab);
     if(el)el.style.display=tab===t?'block':'none';
     const btn=document.getElementById('atab-'+tab);
@@ -4325,7 +4364,15 @@ function doLogin(){
   const found=admins.find(a=>a.u===u&&a.p===p);
   // Fully approved locally — log in immediately
   if(found && found.role==='admin' && !adminExpired(found)){ _completeLogin(found); return; }
-  if(found && adminExpired(found)){ setErr('login-err','This admin account expired. Please subscribe again to renew.'); return; }
+  if(found && adminExpired(found)){
+    // Auto-switch to Renew tab with username pre-filled
+    const renewUserEl=document.getElementById('renew-user');
+    if(renewUserEl){ renewUserEl.value=u; }
+    setErr('renew-err','');
+    swTab('renew');
+    toast('⚠️ Your account expired. Fill in your payment details below to renew.',5000);
+    return;
+  }
   // Not locally approved — check Google Sheets (covers approvals done on other devices)
   _checkGSApproval(u, p, found||null);
 }
@@ -4369,7 +4416,14 @@ function _completeLogin(found){
     const idx=allA.findIndex(a=>a.u===found.u);
     if(idx>=0){allA[idx].churchId=found.churchId;LS.set('sda-admins',allA);}
   }
-  if(adminExpired(found)){setErr('login-err','This admin account expired. Please subscribe again to renew.');return;}
+  if(adminExpired(found)){
+    const renewUserEl=document.getElementById('renew-user');
+    if(renewUserEl){ renewUserEl.value=found.u; }
+    setErr('renew-err','');
+    swTab('renew');
+    toast('⚠️ Your account expired. Fill in your payment details below to renew.',5000);
+    return;
+  }
   const dl=adminDaysLeft(found);
   openDash(found);
   toast('Welcome back, '+found.n+' 👋'+(dl!==null?' · '+dl+' day'+(dl!==1?'s':'')+' remaining':''),4500);
@@ -4394,21 +4448,50 @@ function doRegister(){
   if(!church){setErr('reg-err','Please select or enter your church.');return}
   admins=LS.get('sda-admins',[]);
   if(admins.find(a=>a.u.toLowerCase()===u.toLowerCase())){setErr('reg-err','Username already taken.');return}
+  const _regChurchId=makeChurchId(church);
+  const _regChurchTaken=admins.find(a=>a.churchId===_regChurchId&&(a.role==='admin'||a.role==='pending_admin')&&!isSuperAdmin(a));
+  if(_regChurchTaken){setErr('reg-err','⚠️ An admin account already exists for '+church+'. Each church can only have one admin.');return}
   const dist=distById(distId);
   const registeredAt=Date.now();
   const na={u,p,n,church,churchId:makeChurchId(church),distId,distName:dist?dist.name:'',conf,registeredAt,role:'pending_admin'};
-  admins.push(na);LS.set('sda-admins',admins);
-  selectedChurch=church;selectedChurchId=makeChurchId(church);selectedDist=dist;selectedConf=conf||null;
-  updateChurchUI();
-  // Don't open dashboard — pending_admin must wait for THABO1 approval
-  document.getElementById('af-r').style.display='none';
-  document.getElementById('af-l').style.display='block';
-  document.getElementById('atab-l').classList.add('on');
-  const rTab=document.getElementById('atab-r');if(rTab)rTab.classList.remove('on');
-  setErr('login-err','');
-  toast('✅ Account created! Awaiting approval by THABO1 before you can log in.',6000);
-  addLog('Registered (pending): '+n+' ('+church+')');
-  ['arn','aru','arp','arc'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+
+  function _doRegSave(){
+    admins.push(na);LS.set('sda-admins',admins);
+    selectedChurch=church;selectedChurchId=makeChurchId(church);selectedDist=dist;selectedConf=conf||null;
+    updateChurchUI();
+    document.getElementById('af-r').style.display='none';
+    document.getElementById('af-l').style.display='block';
+    document.getElementById('atab-l').classList.add('on');
+    const rTab=document.getElementById('atab-r');if(rTab)rTab.classList.remove('on');
+    setErr('login-err','');
+    toast('✅ Account created! Awaiting approval by THABO1 before you can log in.',6000);
+    addLog('Registered (pending): '+n+' ('+church+')');
+    ['arn','aru','arp','arc'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  }
+
+  // Cross-device Firestore church uniqueness check
+  if(window.FB){
+    const regBtn=document.getElementById('reg-btn');
+    if(regBtn){regBtn.disabled=true;regBtn.textContent='⏳ Checking...';}
+    const {getDocs,collection,db}=window.FB;
+    getDocs(collection(db,'subscription_requests'))
+      .then(function(snap){
+        let fbChurchTaken=false;
+        snap.forEach(function(d){
+          const data=d.data();
+          if(data.churchId===na.churchId&&(data.role==='admin'||data.role==='pending_admin')&&data.u!==u) fbChurchTaken=true;
+        });
+        if(fbChurchTaken){
+          setErr('reg-err','⚠️ An admin account already exists for '+church+'. Each church can only have one admin.');
+        } else {
+          _doRegSave();
+        }
+      })
+      .catch(function(){ setErr('reg-err','⚠️ Could not verify church availability. Please check your connection and try again.'); })
+      .then(function(){ if(regBtn){regBtn.disabled=false;regBtn.textContent='✅ Create Account';} });
+  } else {
+    _doRegSave();
+  }
 }
 // ══════════════════════════════════════════════════════════════
 // SUBSCRIPTION SYSTEM — 500 Kwacha / 60 days / THABO1 approval
@@ -4442,6 +4525,10 @@ function submitSubscription() {
   if(!phone)     { subErr('⚠️ Please enter the phone number used to pay.','sub-phone'); return; }
   const allA = LS.get('sda-admins',[]);
   if(allA.find(a=>a.u.toLowerCase()===u.toLowerCase())){ subErr('⚠️ Username already taken. Please choose a different username.','sub-user'); return; }
+  // One admin per church — block if an active or pending admin already exists for this church
+  const churchId = makeChurchId(church);
+  const churchTaken = allA.find(a=> a.churchId===churchId && (a.role==='admin'||a.role==='pending_admin') && !isSuperAdmin(a));
+  if(churchTaken){ subErr('⚠️ An admin account already exists for '+church+'. Each church can only have one admin. Contact your existing admin or THABO1 if there is an issue.','sub-church'); return; }
   const dist = distById(distId);
   const req = {
     u, p, n, church, churchId: makeChurchId(church),
@@ -4452,55 +4539,201 @@ function submitSubscription() {
     subSubmittedAt: Date.now(),
     subAmount: 500
   };
-  allA.push(req);
-  LS.set('sda-admins', allA);
-  admins = allA;
-  // Save to Google Sheets so superadmin sees it across ALL devices
-  // Password is kept so cross-device login verification works
-  var _fbReq = Object.assign({}, req);
-  _fbReq.ts = Date.now();
-
-  function _saveSubToFirebase(attempt) {
-    attempt = attempt || 1;
-    if (!window.FB) {
-      // FB not ready yet — wait and retry up to 5 times
-      if (attempt <= 5) {
-        setTimeout(function() { _saveSubToFirebase(attempt + 1); }, 2000 * attempt);
+  // Inner function that actually saves once all checks pass
+  function _doSubmitSub() {
+    allA.push(req);
+    LS.set('sda-admins', allA);
+    admins = allA;
+    // Save to Firestore so superadmin sees it across ALL devices
+    var _fbReq = Object.assign({}, req);
+    _fbReq.ts = Date.now();
+    function _saveSubToFirebase(attempt) {
+      attempt = attempt || 1;
+      if (!window.FB) {
+        if (attempt <= 5) setTimeout(function() { _saveSubToFirebase(attempt + 1); }, 2000 * attempt);
+        return;
       }
-      return;
+      var addDoc = window.FB.addDoc;
+      var collection = window.FB.collection;
+      var db = window.FB.db;
+      addDoc(collection(db, 'subscription_requests'), _fbReq)
+        .then(function(docRef) {
+          console.log('SDA: sub saved to Firebase', docRef.id);
+          if (attempt === 1) toast('☁️ Request sent to superadmin!', 3000);
+        })
+        .catch(function(err) {
+          console.warn('SDA: Firebase sub save failed (attempt ' + attempt + '):', err);
+          if (attempt <= 3) setTimeout(function() { _saveSubToFirebase(attempt + 1); }, 3000 * attempt);
+          else toast('⚠️ Cloud sync failed: ' + (err.message || err) + '. Please resubmit.', 6000);
+        });
     }
-    var addDoc = window.FB.addDoc;
-    var collection = window.FB.collection;
-    var db = window.FB.db;
-    addDoc(collection(db, 'subscription_requests'), _fbReq)
-      .then(function(docRef) {
-        console.log('SDA: sub saved to Firebase', docRef.id);
-        if (attempt === 1) toast('☁️ Request sent to superadmin!', 3000);
-      })
-      .catch(function(err) {
-        console.warn('SDA: Firebase sub save failed (attempt ' + attempt + '):', err);
-        if (attempt <= 3) {
-          setTimeout(function() { _saveSubToFirebase(attempt + 1); }, 3000 * attempt);
-        } else {
-          toast('⚠️ Cloud sync failed: ' + (err.message || err) + '. Please resubmit.', 6000);
-        }
-      });
+    _saveSubToFirebase(1);
+    // Clear form
+    ['sub-name','sub-user','sub-pw','sub-pw2','sub-txn','sub-phone'].forEach(id=>{
+      const el=document.getElementById(id); if(el)el.value='';
+    });
+    const sc=document.getElementById('sub-conf'); if(sc)sc.value='';
+    const sd=document.getElementById('sub-dist'); if(sd){sd.innerHTML='<option value="">-- Select your district --</option>';sd.disabled=true;}
+    const sch=document.getElementById('sub-church'); if(sch){sch.innerHTML='<option value="">-- Select your church --</option>';sch.disabled=true;}
+    toast('📨 Request submitted! THABO1 will review and approve your subscription.',6500);
+    addLog('Sub request: '+n+' ('+church+') txn:'+txn);
+    swTab('l');
   }
-  _saveSubToFirebase(1);
-  // Clear form
-  ['sub-name','sub-user','sub-pw','sub-pw2','sub-txn','sub-phone'].forEach(id=>{
-    const el=document.getElementById(id); if(el)el.value='';
-  });
-  const sc=document.getElementById('sub-conf'); if(sc)sc.value='';
-  const sd=document.getElementById('sub-dist'); if(sd){sd.innerHTML='<option value="">-- Select your district --</option>';sd.disabled=true;}
-  const sch=document.getElementById('sub-church'); if(sch){sch.innerHTML='<option value="">-- Select your church --</option>';sch.disabled=true;}
-  toast('📨 Request submitted! THABO1 will review and approve your subscription.',6500);
-  addLog('Sub request: '+n+' ('+church+') txn:'+txn);
-  // Switch back to login tab
-  swTab('l');
+  // Cross-device church check via Firestore before saving (falls back immediately if no FB)
+  if(window.FB){
+    const {getDocs, collection, query, where, db} = window.FB;
+    const _cid = makeChurchId(church);
+    getDocs(collection(db,'subscription_requests'))
+      .then(function(snap){
+        let fbChurchTaken = false;
+        snap.forEach(function(d){
+          const data=d.data();
+          if(data.churchId===_cid && (data.role==='admin'||data.role==='pending_admin') && data.u!==u) fbChurchTaken=true;
+        });
+        if(fbChurchTaken){
+          subErr('⚠️ An admin account already exists for '+church+' on another device. Each church can only have one admin.','sub-church');
+        } else {
+          _doSubmitSub();
+        }
+      })
+      .catch(function(){ subErr('⚠️ Could not verify church availability. Please check your connection and try again.','sub-church'); }); // network fail — block
+  } else {
+    _doSubmitSub();
+  }
 }
 // Expose to global scope (function defined inside IIFE)
 window.submitSubscription = submitSubscription;
+
+// ══════════════════════════════════════════════════════════════
+// RENEWAL SYSTEM — expired admins re-subscribe (keep all data)
+// ══════════════════════════════════════════════════════════════
+function submitRenewal() {
+  setErr('renew-err','');
+  function renewErr(msg, focusId) {
+    setErr('renew-err', msg);
+    const errEl = document.getElementById('renew-err');
+    if(errEl) errEl.scrollIntoView({behavior:'smooth', block:'center'});
+    if(focusId) { const f=document.getElementById(focusId); if(f){f.focus();f.style.borderColor='var(--crim2)';setTimeout(()=>f.style.borderColor='',2500);} }
+  }
+  const u    = (document.getElementById('renew-user')?.value  ||'').trim();
+  const p    =  document.getElementById('renew-pw')?.value    ||'';
+  const txn  = (document.getElementById('renew-txn')?.value   ||'').trim();
+  const phone= (document.getElementById('renew-phone')?.value ||'').trim();
+  if(!u)    { renewErr('⚠️ Please enter your username.','renew-user'); return; }
+  if(!p)    { renewErr('⚠️ Please enter your password.','renew-pw'); return; }
+  if(!txn)  { renewErr('⚠️ Please enter your transaction/reference number.','renew-txn'); return; }
+  if(!phone){ renewErr('⚠️ Please enter the phone number used to pay.','renew-phone'); return; }
+  // Find the expired account — check localStorage first
+  const allA = LS.get('sda-admins',[]);
+  const existing = allA.find(a=>a.u===u);
+  // Password must match (if account still exists locally) or at least username present
+  if(existing && existing.p && existing.p !== p) {
+    renewErr('⚠️ Incorrect password. Please enter your existing admin password.','renew-pw'); return;
+  }
+  // Build renewal request — preserve existing church/conf/dist data if available
+  const req = Object.assign({}, existing || {}, {
+    u, p,
+    subTxn: txn,
+    subPhone: phone,
+    subSubmittedAt: Date.now(),
+    subAmount: 500,
+    role: 'renewal_pending',
+    renewalRequestedAt: Date.now()
+  });
+  // Upsert into localStorage
+  const idx = allA.findIndex(a=>a.u===u);
+  if(idx>=0){ allA[idx]=req; } else { allA.push(req); }
+  LS.set('sda-admins', allA);
+  admins = allA;
+  // Save to Firestore
+  function _saveRenewalToFirebase(attempt) {
+    attempt = attempt || 1;
+    if (!window.FB) {
+      if (attempt <= 5) setTimeout(function(){ _saveRenewalToFirebase(attempt+1); }, 2000*attempt);
+      return;
+    }
+    const { addDoc, collection, db } = window.FB;
+    addDoc(collection(db,'subscription_requests'), Object.assign({}, req, {ts: Date.now()}))
+      .then(function(docRef){ console.log('SDA: renewal saved to Firebase', docRef.id); })
+      .catch(function(err){
+        if(attempt<=3) setTimeout(function(){ _saveRenewalToFirebase(attempt+1); }, 3000*attempt);
+        else toast('⚠️ Cloud sync failed: '+(err.message||err)+'. Please resubmit.',6000);
+      });
+  }
+  _saveRenewalToFirebase(1);
+  // Clear sensitive fields
+  ['renew-pw','renew-txn','renew-phone'].forEach(id=>{ const el=document.getElementById(id); if(el)el.value=''; });
+  toast('🔄 Renewal request submitted! THABO1 will review it shortly.',6500);
+  addLog('Renewal request: @'+u+' txn:'+txn);
+  swTab('l');
+}
+window.submitRenewal = submitRenewal;
+
+function approveRenewal(username, fbId) {
+  var _caller = window._currentAdminRef ? window._currentAdminRef() : null;
+  if (!_caller || !isSuperAdmin(_caller)) {
+    if(typeof toast==='function') toast('🔒 Superadmin access only.'); return;
+  }
+  const all = LS.get('sda-admins',[]);
+  const idx = all.findIndex(a=>a.u===username);
+  const renewalFields = { role:'admin', registeredAt:Date.now(), approvedBy:'SEVENTHDAYADVENTIST', approvedAt:Date.now() };
+  if(idx>=0){
+    // Reset expiry, restore to active admin — preserve everything else
+    Object.assign(all[idx], renewalFields);
+    LS.set('sda-admins', all);
+    admins = all;
+  } else {
+    // Account was pruned from this device — reconstruct from Firestore renewal request data
+    // We'll pull the data from the rendered card's dataset or rely on FB fetch below
+    console.log('SDA: approveRenewal — account not in localStorage, will reconstruct from Firestore');
+  }
+  // Update Firestore — reset registeredAt so cross-device login works
+  if(window.FB){
+    const {getDocs,collection,query,where,updateDoc,doc,db}=window.FB;
+    if(fbId){
+      // First get the doc to reconstruct if needed
+      const { getDoc } = window.FB;
+      getDoc(doc(db,'subscription_requests',fbId)).then(snap=>{
+        if(snap.exists()){
+          const data = snap.data();
+          // If account was pruned, recreate it in localStorage from Firestore data
+          const allNow = LS.get('sda-admins',[]);
+          const stillMissing = !allNow.find(a=>a.u===username);
+          if(stillMissing){
+            const restored = Object.assign({}, data, renewalFields);
+            allNow.push(restored);
+            LS.set('sda-admins', allNow);
+            admins = allNow;
+            console.log('SDA: restored pruned admin from Firestore renewal data:', username);
+          }
+        }
+        updateDoc(doc(db,'subscription_requests',fbId), renewalFields).catch(()=>{});
+      }).catch(()=>{ updateDoc(doc(db,'subscription_requests',fbId), renewalFields).catch(()=>{}); });
+    } else {
+      getDocs(query(collection(db,'subscription_requests'),where('u','==',username)))
+        .then(snap=>{
+          const allNow = LS.get('sda-admins',[]);
+          const stillMissing = !allNow.find(a=>a.u===username);
+          snap.forEach(d=>{
+            updateDoc(doc(db,'subscription_requests',d.id), renewalFields).catch(()=>{});
+            if(stillMissing){
+              const restored = Object.assign({}, d.data(), renewalFields);
+              allNow.push(restored);
+            }
+          });
+          if(stillMissing){ LS.set('sda-admins', allNow); admins = allNow; }
+        }).catch(()=>{});
+    }
+  }
+  const nm = idx>=0 ? all[idx].n : username;
+  toast('✅ '+nm+' renewed! Admin access reset for 60 days.',4500);
+  addLog('Approved renewal: '+(nm||username)+' (@'+username+')');
+  var card = document.querySelector('#subs-list [data-u="'+username+'"]');
+  if(card) card.remove(); else renderSubRequests();
+  renderAdmins();
+  updStats();
+}
+window.approveRenewal = approveRenewal;
 
 function subConfChange() {
   const conf=document.getElementById('sub-conf')?.value||'';
@@ -4538,29 +4771,39 @@ function _renderSubList(pending) {
     renderSubBadge(pending.length);
     return;
   }
-  el.innerHTML=pending.map(a=>`
-    <div class="card" data-u="${e(a.u)}" style="padding:13px 15px;margin-bottom:10px;border:1px solid rgba(218,168,64,.2)">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+  el.innerHTML=pending.map(a=>{
+    const isRenewal = a.role==='renewal_pending';
+    const badgeStyle = isRenewal
+      ? 'background:rgba(13,148,136,.15);color:#0d9488;font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;border:1px solid rgba(13,148,136,.35)'
+      : 'background:rgba(192,144,48,.15);color:var(--gold2);font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;border:1px solid rgba(192,144,48,.3)';
+    const badgeLabel = isRenewal ? '🔄 RENEWAL' : '⏳ NEW';
+    const approveBtn = isRenewal
+      ? `<button class=\"btn\" style=\"flex:1;padding:10px 0;font-size:12px;background:rgba(13,148,136,.15);color:#0d9488;border:1px solid rgba(13,148,136,.35);border-radius:10px;font-weight:700;cursor:pointer\" onclick=\"approveRenewal('${e(a.u)}','${e(a._fbId||'')}')\">✅ Approve Renewal</button>`
+      : `<button class=\"btn btn-em\" style=\"flex:1;padding:10px 0;font-size:12px\" onclick=\"approveSubRequest('${e(a.u)}','${e(a._fbId||'')}')\">✅ Approve (60 days)</button>`;
+    const cardBorder = isRenewal ? 'border:1px solid rgba(13,148,136,.25)' : 'border:1px solid rgba(218,168,64,.2)';
+    return `<div class=\"card\" data-u=\"${e(a.u)}\" data-role=\"${e(a.role)}\" style=\"padding:13px 15px;margin-bottom:10px;${cardBorder}\">
+      <div style=\"display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px\">
         <div>
-          <div style="font-weight:700;font-size:13px;color:var(--text)">👤 ${e(a.n)}</div>
-          <div style="font-size:11px;color:var(--text3);margin-top:2px">@${e(a.u)}</div>
+          <div style=\"font-weight:700;font-size:13px;color:var(--text)\">👤 ${e(a.n||a.u)}</div>
+          <div style=\"font-size:11px;color:var(--text3);margin-top:2px\">@${e(a.u)}</div>
         </div>
-        <span style="background:rgba(192,144,48,.15);color:var(--gold2);font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;border:1px solid rgba(192,144,48,.3)">⏳ PENDING</span>
+        <span style=\"${badgeStyle}\">${badgeLabel}</span>
       </div>
-      ${a.church?`<div style="font-size:11.5px;color:var(--text2);margin-bottom:3px">⛪ ${e(a.church)}</div>`:''}
-      ${a.distName?`<div style="font-size:11px;color:var(--text3);margin-bottom:3px">📍 ${e(a.distName)}</div>`:''}
-      <div style="background:rgba(26,122,80,.1);border:1px solid rgba(26,122,80,.2);border-radius:10px;padding:9px 12px;margin:9px 0;font-size:11.5px">
-        <div style="color:var(--em3);font-weight:600;margin-bottom:4px">💳 Payment Details</div>
-        <div style="color:var(--text2)">Amount: <strong>500 Kwacha</strong></div>
-        <div style="color:var(--text2)">Phone: <strong>${e(a.subPhone||'—')}</strong></div>
-        <div style="color:var(--text2)">Ref/Txn: <strong style="color:var(--gold2)">${e(a.subTxn||'—')}</strong></div>
-        <div style="color:var(--text3);font-size:10.5px;margin-top:3px">Submitted: ${a.subSubmittedAt?new Date(a.subSubmittedAt).toLocaleString():'—'}</div>
+      ${a.church?`<div style=\"font-size:11.5px;color:var(--text2);margin-bottom:3px\">⛪ ${e(a.church)}</div>`:''}
+      ${a.distName?`<div style=\"font-size:11px;color:var(--text3);margin-bottom:3px\">📍 ${e(a.distName)}</div>`:''}
+      <div style=\"background:rgba(26,122,80,.1);border:1px solid rgba(26,122,80,.2);border-radius:10px;padding:9px 12px;margin:9px 0;font-size:11.5px\">
+        <div style=\"color:var(--em3);font-weight:600;margin-bottom:4px\">💳 Payment Details</div>
+        <div style=\"color:var(--text2)\">Amount: <strong>500 Kwacha</strong></div>
+        <div style=\"color:var(--text2)\">Phone: <strong>${e(a.subPhone||'—')}</strong></div>
+        <div style=\"color:var(--text2)\">Ref/Txn: <strong style=\"color:var(--gold2)\">${e(a.subTxn||'—')}</strong></div>
+        <div style=\"color:var(--text3);font-size:10.5px;margin-top:3px\">Submitted: ${a.subSubmittedAt?new Date(a.subSubmittedAt).toLocaleString():'—'}</div>
       </div>
-      <div style="display:flex;gap:9px;margin-top:10px">
-        <button class="btn btn-em" style="flex:1;padding:10px 0;font-size:12px" onclick="approveSubRequest('${e(a.u)}','${e(a._fbId||'')}')">✅ Approve (60 days)</button>
-        <button class="btn btn-r" style="flex:1;padding:10px 0;font-size:12px" onclick="rejectSubRequest('${e(a.u)}','${e(a._fbId||'')}')">❌ Reject</button>
+      <div style=\"display:flex;gap:9px;margin-top:10px\">
+        ${approveBtn}
+        <button class=\"btn btn-r\" style=\"flex:1;padding:10px 0;font-size:12px\" onclick=\"rejectSubRequest('${e(a.u)}','${e(a._fbId||'')}')\">❌ Reject</button>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
   renderSubBadge(pending.length);
 }
 
@@ -4579,26 +4822,41 @@ function renderSubRequests() {
   // Pull from Firestore first (cross-device)
   if(window.FB){
     // No where() clause — get all docs and filter client-side
-    // where() requires a Firestore index which causes silent failures
     const {getDocs, collection, db} = window.FB;
+    // Timeout safety: if Firestore hangs, fall back to localStorage after 7s
+    let _settled = false;
+    const _fbFallback = setTimeout(function(){
+      if(_settled) return;
+      _settled = true;
+      console.warn('SDA: renderSubRequests timed out — falling back to localStorage');
+      const local=LS.get('sda-admins',[]).filter(a=>a.role==='pending_admin'||a.role==='renewal_pending');
+      local.sort((a,b)=>{ const ar=a.role==='renewal_pending'?0:1; const br=b.role==='renewal_pending'?0:1; return ar-br; });
+      _renderSubList(local);
+    }, 7000);
     getDocs(collection(db,'subscription_requests'))
       .then(snap=>{
+        if(_settled) return; _settled = true; clearTimeout(_fbFallback);
         const fbPending=[];
-        snap.forEach(d=>{ const data=d.data(); data._fbId=d.id; if(data.role==='pending_admin') fbPending.push(data); });
+        snap.forEach(d=>{ const data=d.data(); data._fbId=d.id; if(data.role==='pending_admin'||data.role==='renewal_pending') fbPending.push(data); });
         // Merge with any local-only entries not yet in Firestore
-        const local=LS.get('sda-admins',[]).filter(a=>a.role==='pending_admin');
+        const local=LS.get('sda-admins',[]).filter(a=>a.role==='pending_admin'||a.role==='renewal_pending');
         const allUsers=new Set(fbPending.map(a=>a.u));
         local.forEach(a=>{ if(!allUsers.has(a.u)) fbPending.push(a); });
+        // Renewals first, then new requests
+        fbPending.sort((a,b)=>{ const ar=a.role==='renewal_pending'?0:1; const br=b.role==='renewal_pending'?0:1; return ar-br; });
         _renderSubList(fbPending);
       })
       .catch(function(err){
+        if(_settled) return; _settled = true; clearTimeout(_fbFallback);
         console.warn('SDA: renderSubRequests Firebase failed:', err);
-        const local=LS.get('sda-admins',[]).filter(a=>a.role==='pending_admin');
+        const local=LS.get('sda-admins',[]).filter(a=>a.role==='pending_admin'||a.role==='renewal_pending');
+        local.sort((a,b)=>{ const ar=a.role==='renewal_pending'?0:1; const br=b.role==='renewal_pending'?0:1; return ar-br; });
         _renderSubList(local);
       });
   } else {
     // No Firebase — use localStorage only
-    const local=LS.get('sda-admins',[]).filter(a=>a.role==='pending_admin');
+    const local=LS.get('sda-admins',[]).filter(a=>a.role==='pending_admin'||a.role==='renewal_pending');
+    local.sort((a,b)=>{ const ar=a.role==='renewal_pending'?0:1; const br=b.role==='renewal_pending'?0:1; return ar-br; });
     _renderSubList(local);
   }
 }
@@ -4649,7 +4907,7 @@ function rejectSubRequest(username, fbId) {
   }
   window._rejectPending = null;
   const all=LS.get('sda-admins',[]);
-  const filtered=all.filter(a=>!(a.u===username&&a.role==='pending_admin'));
+  const filtered=all.filter(a=>!(a.u===username&&(a.role==='pending_admin'||a.role==='renewal_pending')));
   LS.set('sda-admins',filtered);
   admins=filtered;
   // Delete from Google Sheets
@@ -7608,7 +7866,7 @@ self.addEventListener('fetch',ev=>{
 
   // ── Expose HTML-event-handler functions to window (required for onclick= attributes)
   // ── All other app state remains private inside this IIFE scope.
-  window._dFilterChurches=_dFilterChurches;window._dFilterDists=_dFilterDists;window._dRenderLib=_dRenderLib;window._dRenderRec=_dRenderRec;window._dRenderStories=_dRenderStories;window._dSearchHealth=_dSearchHealth;window.addAct=addAct;window.addMiss=addMiss;window.adminGoLive=adminGoLive;window.calNext=calNext;window.calPrev=calPrev;window.chH=chH;window.closeLB=closeLB;window.closeStory=closeStory;window.delAct=delAct;window.dismissPWA=dismissPWA;window.doLogin=doLogin;window.doLogout=doLogout;window.doRegister=doRegister;window.downloadLog=downloadLog;window.endStream=endStream;window.restoreActiveStream=restoreActiveStream;window.startStreamPolling=startStreamPolling;window.stopStreamPolling=stopStreamPolling;window.goBack1=goBack1;window.goBack2=goBack2;window.handleActPhoto=handleActPhoto;window.handleAudio=handleAudio;window.handlePhotos=handlePhotos;window.handleVideo=handleVideo;window.hidePicker=hidePicker;window.installPWA=installPWA;window.nav=nav;window.addPhotosLocal=addPhotosLocal;window.testCloudinary=testCloudinary;window.testSupabase=testSupabase;window.addPhotoFromURL=addPhotoFromURL;window.nav._isStub=false;window.openStory=openStory;window.pickConf=pickConf;window.pickManualChurch=pickManualChurch;window.pinMsg=pinMsg;window.quickLaunch=quickLaunch;window.regConfChange=regConfChange;window.regDistChange=regDistChange;window.rndH=rndH;window.sendAnn=sendAnn;window.sendChat=sendChat;window.setActsFilter=setActsFilter;window.setHCat=setHCat;window.setLibF=setLibF;window.setMode=setMode;window.setRecF=setRecF;window.setStF=setStF;window.shareAct=shareAct;window.showPicker=showPicker;window.showRegManual=showRegManual;window.submitPrayer=submitPrayer;window.submitReq=submitReq;window.swSec=swSec;window.swTab=swTab;window.togRec=togRec;window.toggleCalView=toggleCalView;window.toggleListView=toggleListView;window.toggleTheme=toggleTheme;window.memRegConfChange=memRegConfChange;window.memRegDistChange=memRegDistChange;window.memCCConfChange=memCCConfChange;window.memCCDistChange=memCCDistChange;window.memSaveChurch=memSaveChurch;window.toggleMin=toggleMin;window.submitSubscription=submitSubscription;window.subConfChange=subConfChange;window.subDistChange=subDistChange;window.renderSubRequests=renderSubRequests;window.approveSubRequest=approveSubRequest;window.rejectSubRequest=rejectSubRequest;window.renderSubBadge=renderSubBadge;
+  window._dFilterChurches=_dFilterChurches;window._dFilterDists=_dFilterDists;window._dRenderLib=_dRenderLib;window._dRenderRec=_dRenderRec;window._dRenderStories=_dRenderStories;window._dSearchHealth=_dSearchHealth;window.addAct=addAct;window.addMiss=addMiss;window.adminGoLive=adminGoLive;window.calNext=calNext;window.calPrev=calPrev;window.chH=chH;window.closeLB=closeLB;window.closeStory=closeStory;window.delAct=delAct;window.dismissPWA=dismissPWA;window.doLogin=doLogin;window.doLogout=doLogout;window.doRegister=doRegister;window.downloadLog=downloadLog;window.endStream=endStream;window.restoreActiveStream=restoreActiveStream;window.startStreamPolling=startStreamPolling;window.stopStreamPolling=stopStreamPolling;window.goBack1=goBack1;window.goBack2=goBack2;window.handleActPhoto=handleActPhoto;window.handleAudio=handleAudio;window.handlePhotos=handlePhotos;window.handleVideo=handleVideo;window.hidePicker=hidePicker;window.installPWA=installPWA;window.nav=nav;window.addPhotosLocal=addPhotosLocal;window.testCloudinary=testCloudinary;window.testSupabase=testSupabase;window.addPhotoFromURL=addPhotoFromURL;window.nav._isStub=false;window.openStory=openStory;window.pickConf=pickConf;window.pickManualChurch=pickManualChurch;window.pinMsg=pinMsg;window.quickLaunch=quickLaunch;window.regConfChange=regConfChange;window.regDistChange=regDistChange;window.rndH=rndH;window.sendAnn=sendAnn;window.sendChat=sendChat;window.setActsFilter=setActsFilter;window.setHCat=setHCat;window.setLibF=setLibF;window.setMode=setMode;window.setRecF=setRecF;window.setStF=setStF;window.shareAct=shareAct;window.showPicker=showPicker;window.showRegManual=showRegManual;window.submitPrayer=submitPrayer;window.submitReq=submitReq;window.swSec=swSec;window.swTab=swTab;window.togRec=togRec;window.toggleCalView=toggleCalView;window.toggleListView=toggleListView;window.toggleTheme=toggleTheme;window.memRegConfChange=memRegConfChange;window.memRegDistChange=memRegDistChange;window.memCCConfChange=memCCConfChange;window.memCCDistChange=memCCDistChange;window.memSaveChurch=memSaveChurch;window.toggleMin=toggleMin;window.submitSubscription=submitSubscription;window.subConfChange=subConfChange;window.subDistChange=subDistChange;window.renderSubRequests=renderSubRequests;window.approveSubRequest=approveSubRequest;window.rejectSubRequest=rejectSubRequest;window.renderSubBadge=renderSubBadge;window.approveRenewal=approveRenewal;window.submitRenewal=submitRenewal;
 window.minTab=minTab;
 function toggleAcc(key){const btn=document.getElementById('acc-'+key);const body=document.getElementById('acc-body-'+key);if(!btn||!body)return;const opening=!body.classList.contains('open');btn.classList.toggle('open',opening);body.classList.toggle('open',opening);btn.setAttribute('aria-expanded',opening);try{var s=JSON.parse(localStorage.getItem('sda-acc-state')||'{}');s[key]=opening;localStorage.setItem('sda-acc-state',JSON.stringify(s));}catch(e){}}
 window.toggleAcc=toggleAcc;
@@ -10222,14 +10480,3 @@ window.campRegToggleLock = function() {
   _campRegSet(nowOpen);
   _campRegUpdateTile(nowOpen);
   _campRegRenderCard(nowOpen);
-  if (typeof toast === 'function') toast(nowOpen ? '🔓 Registration unlocked' : '🔒 Registration locked');
-  _campRegSaveCloud(nowOpen, null);
-};
-
-(function() {
-  _campRegUpdateTile(_campRegIsOpen());
-  _campRegLoadCloud(function(open) { _campRegUpdateTile(open); });
-})();
-</script>
-</body>
-</html>
