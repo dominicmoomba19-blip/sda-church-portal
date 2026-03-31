@@ -526,7 +526,7 @@ else console.info('Google Sheets not configured — running in local mode (local
 /* ═══════════════════════ RESET & BASE ═══════════════════════ */
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 html { scroll-behavior: smooth; -webkit-tap-highlight-color: transparent; text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; }
-body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; min-height: 100vh; overflow-x: hidden; line-height: 1.58; }
+body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; min-height: 100vh; min-height: -webkit-fill-available; overflow-x: hidden; line-height: 1.58; }
 body.theme-ready { transition: background .25s, color .25s; }
 body::before { content: ''; position: fixed; inset: 0; background: var(--grain); pointer-events: none; z-index: 9999; }
 h1,h2,h3,h4 { font-family: 'Playfair Display', serif; line-height: 1.2; letter-spacing: .2px; }
@@ -576,7 +576,7 @@ img { display: block; max-width: 100%; }
 .page.on .versecard { animation:riseIn .3s ease both; }
 
 /* ═══════════════════════ CHURCH PICKER OVERLAY ═══════════════════════ */
-.overlay { position:fixed; inset:0; z-index:500; display:none; flex-direction:column; background:var(--ov-bg); overflow-y:auto; }
+.overlay { position:fixed; inset:0; z-index:500; display:none; flex-direction:column; background:var(--ov-bg); overflow-y:auto; -webkit-overflow-scrolling:touch; }
 .overlay.on { display:flex; animation:fu .2s ease; }
 .ov-head { padding:16px; border-bottom:1px solid var(--bor); background:var(--ov-bg); position:sticky; top:0; z-index:10; display:flex; align-items:center; gap:10px; backdrop-filter:blur(12px); }
 .ov-title { font-family:'Playfair Display',serif; font-size:18px; color:var(--gold2); flex:1; }
@@ -10535,6 +10535,25 @@ if (installBtn) {
 window.addEventListener('appinstalled', () => {
   document.getElementById('pwa-banner')?.classList.remove('on');
 });
+
+// iOS Safari — no beforeinstallprompt, show manual instructions instead
+(function() {
+  var isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  var isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+  if (!isIos || isStandalone) return;
+  if (localStorage.getItem('pwa-dismissed')) return;
+  var banner = document.getElementById('pwa-banner');
+  if (!banner) return;
+  // Swap content to iOS instructions
+  banner.innerHTML =
+    '<div class="pwa-ico">⛪</div>' +
+    '<div class="pwa-text" style="flex:1">' +
+      '<strong>Install SDA Portal</strong>' +
+      '<small>Tap <strong>Share</strong> (📤) then <strong>Add to Home Screen</strong></small>' +
+    '</div>' +
+    '<button class="pwa-dismiss" onclick="this.closest(\'#pwa-banner\').classList.remove(\'on\');localStorage.setItem(\'pwa-dismissed\',\'1\')">✕</button>';
+  setTimeout(function() { banner.classList.add('on'); }, 3500);
+})();
 </script>
 
 <script>
