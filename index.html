@@ -9588,8 +9588,10 @@ function nav(p) {
   if (p === 'resources')   { if (typeof renderResources   === 'function') renderResources(); }
   if (p === 'register-church') { if (typeof renderRegisteredChurches === 'function') renderRegisteredChurches(); }
   if (p === 'camp-register')  {
-    if (!_campRegIsOpen()) { if (typeof toast === 'function') toast('🔒 Event registration is currently closed.'); return; }
-    if (typeof renderCampRegistrations  === 'function') renderCampRegistrations();
+    _campRegLoadCloud(function(open) {
+      if (!open) { if (typeof toast === 'function') toast('🔒 Event registration is currently closed.'); nav('home'); return; }
+      if (typeof renderCampRegistrations === 'function') renderCampRegistrations();
+    });
   }
 }
 
@@ -9711,6 +9713,12 @@ document.addEventListener('DOMContentLoaded', function() {
   }
   if (window.FB_READY) { initFirebase(); }
   else { window.addEventListener('fb-ready', initFirebase, { once: true }); }
+
+  // ── EVENT REGISTRATION: sync tile state on boot ──
+  if (typeof _campRegUpdateTile === 'function') {
+    _campRegUpdateTile(_campRegIsOpen()); // show cached state immediately
+    _campRegLoadCloud(function(open) { _campRegUpdateTile(open); }); // confirm with cloud
+  }
 });
 
 /* ═══════════════════════════════════════════════════════════════
@@ -10441,18 +10449,21 @@ function renderCampRegistrations() {
     }).join('');
   }
 
-  // Try Firestore/Google Sheets first, fall back to localStorage
+  // Use the same dynamic collection/key as submitCampRegistration
+  var eventType = window._campEventType || 'Camp Meeting';
+  var colName   = _campCollection(eventType);
+  var lsKey     = 'campRegs_' + colName;
   if (window.FB) {
-    var col = window.FB.collection(window.FB.db, 'campRegistrations');
+    var col = window.FB.collection(window.FB.db, colName);
     window.FB.getDocs(col).then(function(snap) {
       var regs = [];
       snap.forEach(function(d) { regs.push(d.data()); });
       draw(regs);
     }).catch(function() {
-      try { draw(JSON.parse(localStorage.getItem('campRegs') || '[]')); } catch(e) { draw([]); }
+      try { draw(JSON.parse(localStorage.getItem(lsKey) || '[]')); } catch(e) { draw([]); }
     });
   } else {
-    try { draw(JSON.parse(localStorage.getItem('campRegs') || '[]')); } catch(e) { draw([]); }
+    try { draw(JSON.parse(localStorage.getItem(lsKey) || '[]')); } catch(e) { draw([]); }
   }
 }
 
@@ -11174,7 +11185,9 @@ function _campRegRenderCard(open) {
 }
 
 window.campRegTileClick = function() {
-  _campRegIsOpen() ? (typeof nav==='function' && nav('camp-register')) : (typeof toast==='function' && toast('🔒 Event registration is currently closed.'));
+  _campRegLoadCloud(function(open) {
+    open ? (typeof nav === 'function' && nav('camp-register')) : (typeof toast === 'function' && toast('🔒 Event registration is currently closed.'));
+  });
 };
 
 window.renderRegLock = function() {
@@ -11186,10 +11199,13 @@ window.renderRegLock = function() {
 
 window.campRegToggleLock = function() {
   var nowOpen = !_campRegIsOpen();
-  _campRegSet(nowOpen);
-  _campRegUpdateTile(nowOpen);
-  _campRegRenderCard(nowOpen);
+  _campRegSaveCloud(nowOpen, function() {
+    _campRegUpdateTile(nowOpen);
+    _campRegRenderCard(nowOpen);
+  });
+};
 
+</script>
 <script>
 // ══════════════════════════════════════════════════════════════
 //  BIBLE VERSE OF THE DAY
