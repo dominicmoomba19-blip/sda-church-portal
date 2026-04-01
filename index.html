@@ -2144,7 +2144,7 @@ textarea.finp { resize:vertical; min-height:90px; }
         <button class="anb" id="log-tab" onclick="swSec(this,'log')"><span class="ai">📋</span>Log</button>
         <button class="anb" onclick="swSec(this,'adms')"><span class="ai">👥</span>Admins</button>
         <button class="anb" id="mem-approval-tab" onclick="swSec(this,'mem-approval')"><span class="ai">👥</span>Members</button>
-        <button class="anb" id="camp-regs-tab" onclick="swSec(this,'camp-regs'); renderAdminCampRegs(); renderRegLock();"><span class="ai">📋</span>Event Regs</button>
+        <button class="anb" id="camp-regs-tab" onclick="swSec(this,'camp-regs'); renderAdminCampRegs(); window.renderRegLock();"><span class="ai">📋</span>Event Regs</button>
         <button class="anb" id="subs-tab" style="display:none" onclick="swSec(this,'subs'); renderSubRequests();"><span class="ai">💳</span>Subscriptions<span id="subs-badge" style="display:none;background:var(--crim2);color:#fff;font-size:9px;font-weight:700;border-radius:8px;padding:1px 5px;margin-left:4px">0</span></button>
         
 
@@ -9315,7 +9315,7 @@ function swSec(btn, sec) {
     }
   }
   const all = ['media','acts','miss','stream','pa','ra','log','adms','subs',
-                'attendance-adm','give-adm','mem-approval'];
+                'attendance-adm','give-adm','mem-approval','camp-regs'];
   all.forEach(s => { const x = document.getElementById('sec-'+s); if (x) x.style.display='none'; });
   const target = document.getElementById('sec-' + sec);
   if (target) target.style.display = 'block';
@@ -9331,6 +9331,7 @@ function swSec(btn, sec) {
   if (sec==='attendance-adm') (window.renderAdminAttendance||renderAdminAttendance)?.();
   if (sec==='give-adm')       (window.renderAdminGiving||renderAdminGiving)?.();
   if (sec==='mem-approval')   (window.renderAdminMemberApproval||renderAdminMemberApproval)?.();
+  if (sec==='camp-regs')      { (window.renderAdminCampRegs||renderAdminCampRegs)?.(); if (typeof window.renderRegLock === 'function') window.renderRegLock(); }
   if (sec==='media'||sec==='stream') { if(typeof refreshAdmChurchContext==='function') refreshAdmChurchContext(); if(sec==='media'&&typeof refreshMediaStorageBadge==='function') refreshMediaStorageBadge(); }
 }
 
