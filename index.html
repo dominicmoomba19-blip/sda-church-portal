@@ -81,7 +81,7 @@
 (function(){
   var PAGES=['home','devotional','activities','missions','about','media','library',
     'recipes','health','stories','prayer','requests','live','admin','member','giving',
-    'attend','ministries','testimonies','prayerwall','sermons','resources','register-church'];
+    'attend','ministries','testimonies','prayerwall','sermons','resources','register-church','hymnal'];
   function _nav(p){
     PAGES.forEach(function(id){
       var el=document.getElementById('page-'+id);
@@ -113,6 +113,7 @@
 <!-- Firebase SDK (compat) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
 <!-- Google Sheets backend (via Google Apps Script web app) -->
 <script>
 // ═══════════════════════════════════════════════════════════════
@@ -1616,6 +1617,7 @@ textarea.finp { resize:vertical; min-height:90px; }
     <div class="mg">
       <div class="mc tg" onclick="nav('library')"><span class="mi">📚</span><div class="mt">SDA Library</div><div class="md">25+ free books</div></div>
       <div class="mc to" onclick="nav('recipes')"><span class="mi">🍽️</span><div class="mt">Recipes</div><div class="md">45 healthy dishes</div></div>
+      <div class="mc tg" onclick="nav('hymnal')"><span class="mi">🎶</span><div class="mt">Hymnal</div><div class="md">SDA Hymnal · 100 hymns</div></div>
       <div class="mc tb" onclick="nav('health')"><span class="mi">💚</span><div class="mt">Health Talks</div><div class="md">NEWSTART principles</div></div>
       <div class="mc tr" onclick="nav('stories')"><span class="mi">📖</span><div class="mt">Kids Stories</div><div class="md">Ages 3–12 · 25 stories</div></div>
       <div class="mc tb" onclick="nav('about')"><span class="mi">ℹ️</span><div class="mt">About</div><div class="md">Guide, conferences &amp; contact</div></div>
@@ -2146,6 +2148,7 @@ textarea.finp { resize:vertical; min-height:90px; }
         <button class="anb" id="mem-approval-tab" onclick="swSec(this,'mem-approval')"><span class="ai">👥</span>Members</button>
         <button class="anb" id="camp-regs-tab" onclick="swSec(this,'camp-regs'); renderAdminCampRegs(); renderRegLock();"><span class="ai">📋</span>Event Regs</button>
         <button class="anb" id="subs-tab" style="display:none" onclick="swSec(this,'subs'); renderSubRequests();"><span class="ai">💳</span>Subscriptions<span id="subs-badge" style="display:none;background:var(--crim2);color:#fff;font-size:9px;font-weight:700;border-radius:8px;padding:1px 5px;margin-left:4px">0</span></button>
+        <button class="anb" id="push-tab" onclick="swSec(this,'push'); initPushSection();"><span class="ai">🔔</span>Push Notify</button>
 
       </div>
 
@@ -2271,6 +2274,63 @@ textarea.finp { resize:vertical; min-height:90px; }
 
       <div id="sec-pa" style="display:none"><div class="sdiv">Prayer Requests</div><div id="adm-pl"><div class="empty">No prayers yet.</div></div></div>
       <div id="sec-ra" style="display:none"><div class="sdiv">Member Requests</div><div id="adm-rl"><div class="empty">No requests yet.</div></div></div>
+
+      <!-- ── PUSH NOTIFICATIONS SECTION ──────────────────────────────── -->
+      <div id="sec-push" style="display:none">
+        <div class="sdiv">🔔 Push Notifications</div>
+
+        <!-- Permission / subscription status bar -->
+        <div id="push-status-bar" style="display:flex;align-items:center;gap:10px;background:var(--card2);border:1px solid var(--bor2);border-radius:12px;padding:12px 15px;margin-bottom:16px;font-size:12.5px;color:var(--text2)">
+          <span id="push-status-dot" style="width:9px;height:9px;border-radius:50%;background:var(--text4);flex-shrink:0"></span>
+          <span id="push-status-msg">Checking notification status…</span>
+          <button id="push-enable-btn" onclick="enablePushForAdmin()" style="display:none;margin-left:auto;padding:6px 13px;border-radius:8px;border:none;background:linear-gradient(135deg,var(--gold3),var(--gold2));color:#fff;font-size:11px;font-weight:700;cursor:pointer">Enable</button>
+        </div>
+
+        <!-- Scope selector -->
+        <label class="flbl">Target audience</label>
+        <select id="push-scope" class="finp" style="margin-bottom:14px">
+          <option value="all">📡 All subscribed members (all churches)</option>
+          <option value="church">⛪ My church only</option>
+        </select>
+
+        <!-- Compose -->
+        <label class="flbl">Notification title</label>
+        <input class="finp" id="push-title" type="text" placeholder="e.g. Sabbath Service Reminder" style="margin-bottom:10px">
+        <label class="flbl">Message body</label>
+        <textarea class="finp" id="push-body" rows="3" placeholder="e.g. Sabbath School begins at 9:30 AM. Come blessed!" style="resize:vertical;font-family:inherit;line-height:1.5"></textarea>
+        <label class="flbl" style="margin-top:10px">Link URL <span style="color:var(--text3);font-weight:400">(optional)</span></label>
+        <input class="finp" id="push-url" type="url" placeholder="https://… (leave blank to open the app)">
+
+        <!-- Send button + counter -->
+        <div style="display:flex;align-items:center;gap:10px;margin-top:14px;flex-wrap:wrap">
+          <button class="btn btn-em" id="push-send-btn" onclick="sendPushNotification()" style="flex:1;min-width:160px">
+            🔔 Send Notification
+          </button>
+          <span id="push-sub-count" style="font-size:11px;color:var(--text3)">— subscribers</span>
+        </div>
+
+        <!-- Result -->
+        <div id="push-result" style="display:none;margin-top:14px;padding:12px 15px;border-radius:11px;font-size:12.5px;border:1px solid var(--bor2);background:var(--card2)"></div>
+
+        <!-- History -->
+        <div class="sdiv" style="margin-top:20px">Sent History</div>
+        <div id="push-history" style="font-size:12.5px;color:var(--text2)">
+          <div class="empty">No notifications sent yet.</div>
+        </div>
+
+        <!-- Setup note for self-hosters -->
+        <details style="margin-top:20px;border:1px solid var(--bor2);border-radius:11px;padding:12px 15px;background:var(--card2)">
+          <summary style="font-size:12px;font-weight:700;color:var(--text3);cursor:pointer;letter-spacing:.3px">⚙️ Setup requirements</summary>
+          <div style="margin-top:10px;font-size:11.5px;color:var(--text3);line-height:1.7">
+            <p style="margin:0 0 8px">Push notifications need two config values — no extra files:</p>
+            <ol style="margin:0;padding-left:18px;display:flex;flex-direction:column;gap:5px">
+              <li><strong style="color:var(--text2)">VAPID key</strong> — Firebase Console → Project Settings → Cloud Messaging → Web Push Certificates → Generate key pair. Paste the public key into <code style="background:var(--bg3);padding:1px 5px;border-radius:4px">PUSH_VAPID_KEY</code> in the script.</li>
+              <li><strong style="color:var(--text2)">Cloud Function URL</strong> — Deploy a Firebase Cloud Function that accepts <code style="background:var(--bg3);padding:1px 5px;border-radius:4px">POST { tokens, title, body, url }</code> and calls <code style="background:var(--bg3);padding:1px 5px;border-radius:4px">admin.messaging().sendEachForMulticast()</code>. Paste its URL into <code style="background:var(--bg3);padding:1px 5px;border-radius:4px">PUSH_CLOUD_FN_URL</code>.</li>
+            </ol>
+            <p style="margin:8px 0 0;color:var(--gold2)">✅ No separate SW file needed — the messaging service worker is bundled inside this file.</p>
+          </div>
+        </details>
+      </div>
       <div id="sec-log" style="display:none"><div class="sdiv" style="margin-bottom:11px">Activity Log</div><button class="btn btn-g" onclick="downloadLog()" style="padding:9px 17px;font-size:11.5px;margin-bottom:13px">📥 Download Full Log</button><div id="log-e"><div class="empty">No activity yet.</div></div></div>
 
 
@@ -2843,6 +2903,48 @@ textarea.finp { resize:vertical; min-height:90px; }
   <input class="finp srch-inp" id="res-q" type="search" placeholder="🔍 Search resources..." oninput="renderResources()" style="margin-bottom:9px">
   <div class="frow" id="res-cats"></div>
   <div id="res-list"><div class="empty">No resources uploaded yet.</div></div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     HYMNAL PAGE
+═══════════════════════════════════════════════════════════════════════════ -->
+<div class="page" id="page-hymnal">
+  <button class="bbtn" onclick="hymnBack()">← Back</button>
+
+  <!-- LIST VIEW -->
+  <div id="hymnal-list-view">
+    <div class="pghdr"><div class="phi phi-g">🎶</div><div><h2>SDA Hymnal</h2><p>100 hymns · searchable</p></div></div>
+    <input class="finp srch-inp" id="hymn-q" type="search" placeholder="🔍 Search by title, number or first line..." oninput="renderHymnList()" style="margin-bottom:10px">
+    <div style="display:flex;gap:7px;margin-bottom:13px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none">
+      <button class="anb on" id="hcat-all"  onclick="setHCat('all',this)">All</button>
+      <button class="anb" id="hcat-praise"  onclick="setHCat('praise',this)">Praise</button>
+      <button class="anb" id="hcat-advent"  onclick="setHCat('advent',this)">Second Advent</button>
+      <button class="anb" id="hcat-faith"   onclick="setHCat('faith',this)">Faith &amp; Trust</button>
+      <button class="anb" id="hcat-prayer"  onclick="setHCat('prayer',this)">Prayer</button>
+      <button class="anb" id="hcat-service" onclick="setHCat('service',this)">Service</button>
+      <button class="anb" id="hcat-comfort" onclick="setHCat('comfort',this)">Comfort</button>
+      <button class="anb" id="hcat-fav"     onclick="setHCat('fav',this)">❤️ Favourites</button>
+    </div>
+    <div id="hymn-list"></div>
+  </div>
+
+  <!-- DETAIL VIEW -->
+  <div id="hymnal-detail-view" style="display:none">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+      <div style="flex:1">
+        <div id="hymn-detail-num" style="font-size:11px;color:var(--text3);font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:2px"></div>
+        <div id="hymn-detail-title" style="font-family:'Playfair Display',serif;font-size:22px;color:var(--gold2);line-height:1.2"></div>
+        <div id="hymn-detail-meter" style="font-size:11px;color:var(--text3);margin-top:3px"></div>
+      </div>
+      <button id="hymn-fav-btn" onclick="toggleHymnFav()" style="background:var(--card2);border:1px solid var(--bor2);border-radius:50%;width:40px;height:40px;font-size:20px;cursor:pointer;flex-shrink:0;transition:all .2s">♡</button>
+    </div>
+    <div id="hymn-detail-lyrics" style="font-size:15px;line-height:1.85;color:var(--text);white-space:pre-wrap;font-family:'Playfair Display',serif"></div>
+    <div style="margin-top:22px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-g" onclick="window.print()" style="padding:9px 18px;font-size:12px">🖨️ Print</button>
+      <button class="btn" onclick="shareHymn()" style="padding:9px 18px;font-size:12px">📤 Share</button>
+    </div>
+  </div>
 </div>
 
 <!-- BOTTOM NAV -->
@@ -3720,7 +3822,7 @@ function actMatchesDistrict(a){
 }
 
 /* ===== NAVIGATION ===== */
-const PAGES=['home','devotional','activities','missions','about','media','library','recipes','health','stories','prayer','requests','live','admin','member','giving','attend','ministries','testimonies','prayerwall','sermons','resources','register-church','camp-register'];
+const PAGES=['home','devotional','activities','missions','about','media','library','recipes','health','stories','prayer','requests','live','admin','member','giving','attend','ministries','testimonies','prayerwall','sermons','resources','register-church','camp-register','hymnal'];
 const BN_MAP={home:'bn-home',devotional:'bn-devotional',media:'bn-media',prayer:'bn-prayer',prayerwall:'bn-prayer',member:'bn-member'};
 const TN_MAP={home:'tnb-home'};
 function nav(p){
@@ -6365,6 +6467,216 @@ function setMode(m){
 }
 function pinMsg(){const t=document.getElementById('pin-t').value.trim();if(!t)return;addChat('📌 PINNED',t,true);document.getElementById('pin-t').value='';toast('Pinned!')}
 function sendAnn(){const t=document.getElementById('ann-t').value.trim();if(!t)return;addChat('📢 ADMIN',t,true);document.getElementById('ann-t').value='';toast('Announcement sent!')}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PUSH NOTIFICATIONS (FCM Web Push)
+// ─────────────────────────────────────────────────────────────────────────────
+// ❶ Replace PUSH_VAPID_KEY with your Web Push certificate public key from
+//    Firebase Console → Project Settings → Cloud Messaging → Web Push Certificates
+// ❷ Replace PUSH_CLOUD_FN_URL with your deployed Firebase Cloud Function URL
+//    that accepts POST { tokens:[], title, body, url } and calls admin.messaging()
+// ─────────────────────────────────────────────────────────────────────────────
+var PUSH_VAPID_KEY    = 'BOja_9REVq7UfDzkTp9Lpir9f0clCdWHR09GKifKOhwFpRfroxNilE4zwX_v9-z-jPZ7LvcFSFyo7UVeWWa-eQo';
+var PUSH_CLOUD_FN_URL = 'https://YOUR_REGION-YOUR_PROJECT.cloudfunctions.net/sendPushNotification';
+var PUSH_TOKEN_COLL   = 'push_tokens';   // Firestore collection that stores {token, churchId, ts}
+var _fcmMessaging     = null;
+var _pushHistory      = JSON.parse(localStorage.getItem('sda-push-history') || '[]');
+
+function _getPushMessaging() {
+  if (_fcmMessaging) return _fcmMessaging;
+  try {
+    var fbApp = firebase.app('sda-portal');
+    _fcmMessaging = firebase.messaging(fbApp);
+    return _fcmMessaging;
+  } catch(e) {
+    console.warn('FCM messaging init failed:', e);
+    return null;
+  }
+}
+
+function initPushSection() {
+  renderPushHistory();
+  _updatePushSubCount();
+
+  var perm = Notification.permission;
+  var dot  = document.getElementById('push-status-dot');
+  var msg  = document.getElementById('push-status-msg');
+  var btn  = document.getElementById('push-enable-btn');
+
+  if (!('Notification' in window) || !('serviceWorker' in navigator)) {
+    if (dot) dot.style.background = '#e55';
+    if (msg) msg.textContent = 'Push notifications not supported in this browser.';
+    return;
+  }
+
+  if (perm === 'granted') {
+    if (dot) dot.style.background = '#3c9';
+    if (msg) msg.textContent = 'Push enabled on this device. You can send notifications below.';
+    if (btn) btn.style.display = 'none';
+    _registerAdminToken();
+  } else if (perm === 'denied') {
+    if (dot) dot.style.background = '#e55';
+    if (msg) msg.textContent = 'Notifications blocked in browser settings. Please allow them and reload.';
+  } else {
+    if (dot) dot.style.background = 'var(--gold2)';
+    if (msg) msg.textContent = 'Enable push so your device also receives notifications.';
+    if (btn) btn.style.display = 'block';
+  }
+}
+
+function enablePushForAdmin() {
+  Notification.requestPermission().then(function(perm) {
+    if (perm === 'granted') {
+      initPushSection();
+      _registerAdminToken();
+    } else {
+      toast('⚠️ Permission denied. Allow notifications in browser settings.');
+    }
+  });
+}
+
+function _registerAdminToken() {
+  var msg = _getPushMessaging();
+  if (!msg || PUSH_VAPID_KEY === 'YOUR_VAPID_PUBLIC_KEY_HERE') return;
+  navigator.serviceWorker.ready.then(function(reg) {
+    msg.getToken({ vapidKey: PUSH_VAPID_KEY, serviceWorkerRegistration: reg }).then(function(token) {
+      if (!token) return;
+      var db = window._FBDB;
+      if (!db) return;
+      var admin = currentAdmin || {};
+      db.collection(PUSH_TOKEN_COLL).doc(token).set({
+        token:    token,
+        churchId: admin.churchId || 'all',
+        church:   admin.church   || 'Unknown',
+        role:     'admin',
+        ts:       firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+    }).catch(function(e){ console.warn('FCM getToken error:', e); });
+  });
+}
+
+function _updatePushSubCount() {
+  var db = window._FBDB;
+  var el = document.getElementById('push-sub-count');
+  if (!db || !el) return;
+  db.collection(PUSH_TOKEN_COLL).get().then(function(snap) {
+    el.textContent = snap.size + ' subscriber' + (snap.size === 1 ? '' : 's');
+  }).catch(function(){ el.textContent = '— subscribers'; });
+}
+
+function sendPushNotification() {
+  var title = (document.getElementById('push-title')?.value || '').trim();
+  var body  = (document.getElementById('push-body')?.value  || '').trim();
+  var url   = (document.getElementById('push-url')?.value   || '').trim() || location.href;
+  var scope = document.getElementById('push-scope')?.value || 'all';
+
+  if (!title) { toast('⚠️ Please enter a notification title.'); return; }
+  if (!body)  { toast('⚠️ Please enter a message body.'); return; }
+  if (PUSH_CLOUD_FN_URL === 'https://YOUR_REGION-YOUR_PROJECT.cloudfunctions.net/sendPushNotification') {
+    _pushShowResult(false, '⚙️ Cloud Function URL not configured. See Setup requirements below.');
+    return;
+  }
+
+  var sendBtn = document.getElementById('push-send-btn');
+  if (sendBtn) { sendBtn.disabled = true; sendBtn.textContent = '🔄 Sending…'; }
+
+  // Fetch matching tokens from Firestore
+  var db = window._FBDB;
+  if (!db) { _pushShowResult(false, 'Firestore not available.'); _resetPushBtn(); return; }
+
+  var query = db.collection(PUSH_TOKEN_COLL);
+  if (scope === 'church' && currentAdmin && currentAdmin.churchId) {
+    query = query.where('churchId', '==', currentAdmin.churchId);
+  }
+
+  query.get().then(function(snap) {
+    var tokens = [];
+    snap.forEach(function(d) { if (d.data().token) tokens.push(d.data().token); });
+    if (!tokens.length) {
+      _pushShowResult(false, 'No subscribers found for this audience.');
+      _resetPushBtn(); return;
+    }
+    return fetch(PUSH_CLOUD_FN_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tokens: tokens, title: title, body: body, url: url })
+    }).then(function(r) { return r.json(); }).then(function(res) {
+      var ok = res.successCount > 0;
+      var msg = ok
+        ? '✅ Sent to ' + res.successCount + ' device' + (res.successCount===1?'':'s') + (res.failureCount?' ('+res.failureCount+' failed)':'') + '.'
+        : '❌ All sends failed. Check your Cloud Function logs.';
+      _pushShowResult(ok, msg);
+      if (ok) {
+        // Log to history
+        var entry = { title: title, body: body, scope: scope, ts: Date.now(), sent: res.successCount };
+        _pushHistory.unshift(entry);
+        if (_pushHistory.length > 30) _pushHistory.length = 30;
+        localStorage.setItem('sda-push-history', JSON.stringify(_pushHistory));
+        renderPushHistory();
+        // Clear fields
+        ['push-title','push-body','push-url'].forEach(function(id){ var el=document.getElementById(id); if(el)el.value=''; });
+      }
+      _resetPushBtn();
+    });
+  }).catch(function(err) {
+    _pushShowResult(false, '❌ Error: ' + (err.message || err));
+    _resetPushBtn();
+  });
+}
+
+function _pushShowResult(ok, msg) {
+  var el = document.getElementById('push-result');
+  if (!el) return;
+  el.style.display = 'block';
+  el.style.borderColor = ok ? 'rgba(60,200,120,.3)' : 'rgba(220,70,70,.3)';
+  el.style.color = ok ? '#3c9' : '#e77';
+  el.textContent = msg;
+}
+function _resetPushBtn() {
+  var btn = document.getElementById('push-send-btn');
+  if (btn) { btn.disabled = false; btn.textContent = '🔔 Send Notification'; }
+}
+
+function renderPushHistory() {
+  var el = document.getElementById('push-history');
+  if (!el) return;
+  if (!_pushHistory.length) { el.innerHTML = '<div class="empty">No notifications sent yet.</div>'; return; }
+  el.innerHTML = _pushHistory.map(function(h) {
+    var d = new Date(h.ts);
+    var ds = d.toLocaleDateString([], {month:'short',day:'numeric'}) + ' ' + d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+    return '<div style="padding:10px 0;border-bottom:1px solid var(--bor2)">'
+      + '<div style="font-weight:700;color:var(--text);font-size:12.5px">' + h.title + '</div>'
+      + '<div style="color:var(--text2);font-size:11.5px;margin:2px 0">' + h.body + '</div>'
+      + '<div style="font-size:10.5px;color:var(--text3)">' + ds + ' · ' + (h.scope==='church'?'My church':'All members') + ' · ' + h.sent + ' sent</div>'
+      + '</div>';
+  }).join('');
+}
+
+// Register member/viewer FCM token when they load the app
+(function _autoRegisterMemberToken(){
+  if(!('Notification' in window)||!('serviceWorker' in navigator)) return;
+  if(Notification.permission !== 'granted') return;
+  // Defer until after page fully loads
+  window.addEventListener('load', function(){
+    setTimeout(function(){
+      var msg = _getPushMessaging();
+      if(!msg || PUSH_VAPID_KEY === 'YOUR_VAPID_PUBLIC_KEY_HERE') return;
+      navigator.serviceWorker.ready.then(function(reg){
+        msg.getToken({ vapidKey: PUSH_VAPID_KEY, serviceWorkerRegistration: reg }).then(function(token){
+          if(!token) return;
+          var db = window._FBDB;
+          if(!db) return;
+          var churchId = localStorage.getItem('sda-churchId') || 'all';
+          var church   = localStorage.getItem('sda-church')   || 'Unknown';
+          db.collection(PUSH_TOKEN_COLL).doc(token).set({
+            token: token, churchId: churchId, church: church, role: 'member',
+            ts: firebase.firestore.FieldValue.serverTimestamp()
+          }, { merge: true });
+        }).catch(function(){});
+      });
+    }, 3000);
+  });
+})();
 function addChat(s,msg,ia){
   chatLog.push({s,msg,ia,time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})});
   // Cap chat history at 200 messages to prevent unbounded memory growth
@@ -7867,6 +8179,29 @@ updStats();
   // Service Worker as Blob URL (cache-first with network refresh for offline support)
   if('serviceWorker' in navigator){
     const swCode=`
+importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js');
+firebase.initializeApp({
+  apiKey:'AIzaSyB5sPbca5k0u6YMGZR9dibIDBetr9iEuX4',
+  authDomain:'sda-church-1f5a6.firebaseapp.com',
+  projectId:'sda-church-1f5a6',
+  storageBucket:'sda-church-1f5a6.firebasestorage.app',
+  messagingSenderId:'115595736325',
+  appId:'1:115595736325:web:f20674162802182b6d736c'
+});
+const _msg=firebase.messaging();
+_msg.onBackgroundMessage(function(payload){
+  const n=Object.assign({title:'SDA Zambia',body:'',icon:'/android-chrome-192x192.png',url:'/'},payload.notification,payload.data);
+  self.registration.showNotification(n.title,{body:n.body,icon:n.icon,badge:'/favicon-32x32.png',data:{url:n.url},vibrate:[200,100,200]});
+});
+self.addEventListener('notificationclick',function(ev){
+  ev.notification.close();
+  const url=(ev.notification.data&&ev.notification.data.url)||'/';
+  ev.waitUntil(clients.matchAll({type:'window',includeUncontrolled:true}).then(function(ws){
+    for(var i=0;i<ws.length;i++){if(ws[i].url===url&&'focus' in ws[i])return ws[i].focus();}
+    if(clients.openWindow)return clients.openWindow(url);
+  }));
+});
 // Cache-first with background revalidation (stale-while-revalidate).
 // Users get instant load from cache; cache refreshes silently in background.
 // Version string updated when deploying new builds to bust old cache.
@@ -7956,6 +8291,214 @@ self.addEventListener('fetch',ev=>{
   // ── Expose HTML-event-handler functions to window (required for onclick= attributes)
   // ── All other app state remains private inside this IIFE scope.
   window._dFilterChurches=_dFilterChurches;window._dFilterDists=_dFilterDists;window._dRenderLib=_dRenderLib;window._dRenderRec=_dRenderRec;window._dRenderStories=_dRenderStories;window._dSearchHealth=_dSearchHealth;window.addAct=addAct;window.addMiss=addMiss;window.adminGoLive=adminGoLive;window.calNext=calNext;window.calPrev=calPrev;window.chH=chH;window.closeLB=closeLB;window.closeStory=closeStory;window.delAct=delAct;window.dismissPWA=dismissPWA;window.doLogin=doLogin;window.doLogout=doLogout;window.doRegister=doRegister;window.downloadLog=downloadLog;window.endStream=endStream;window.restoreActiveStream=restoreActiveStream;window.startStreamPolling=startStreamPolling;window.stopStreamPolling=stopStreamPolling;window.goBack1=goBack1;window.goBack2=goBack2;window.handleActPhoto=handleActPhoto;window.handleAudio=handleAudio;window.handlePhotos=handlePhotos;window.handleVideo=handleVideo;window.hidePicker=hidePicker;window.installPWA=installPWA;window.nav=nav;window.addPhotosLocal=addPhotosLocal;window.testCloudinary=testCloudinary;window.testSupabase=testSupabase;window.addPhotoFromURL=addPhotoFromURL;window.nav._isStub=false;window.openStory=openStory;window.pickConf=pickConf;window.pickManualChurch=pickManualChurch;window.pinMsg=pinMsg;window.quickLaunch=quickLaunch;window.regConfChange=regConfChange;window.regDistChange=regDistChange;window.rndH=rndH;window.sendAnn=sendAnn;window.sendChat=sendChat;window.setActsFilter=setActsFilter;window.setHCat=setHCat;window.setLibF=setLibF;window.setMode=setMode;window.setRecF=setRecF;window.setStF=setStF;window.shareAct=shareAct;window.showPicker=showPicker;window.showRegManual=showRegManual;window.submitPrayer=submitPrayer;window.submitReq=submitReq;window.swSec=swSec;window.swTab=swTab;window.togRec=togRec;window.toggleCalView=toggleCalView;window.toggleListView=toggleListView;window.toggleTheme=toggleTheme;window.memRegConfChange=memRegConfChange;window.memRegDistChange=memRegDistChange;window.memCCConfChange=memCCConfChange;window.memCCDistChange=memCCDistChange;window.memSaveChurch=memSaveChurch;window.toggleMin=toggleMin;window.submitSubscription=submitSubscription;window.subConfChange=subConfChange;window.subDistChange=subDistChange;window.renderSubRequests=renderSubRequests;window.approveSubRequest=approveSubRequest;window.rejectSubRequest=rejectSubRequest;window.renderSubBadge=renderSubBadge;window.approveRenewal=approveRenewal;window.submitRenewal=submitRenewal;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HYMNAL
+// ─────────────────────────────────────────────────────────────────────────────
+var _hymnCat = 'all';
+var _hymnId  = null;
+var _hymnFavs = JSON.parse(localStorage.getItem('sda-hymn-favs') || '[]');
+
+var HYMNS = [
+  {n:1,t:"Praise to the Lord, the Almighty",c:"praise",m:"14 14.4.7.8",
+   l:"Praise to the Lord, the Almighty, the King of creation!\nO my soul, praise Him, for He is thy health and salvation!\nAll ye who hear, now to His temple draw near;\nPraise Him in glad adoration.\n\nPraise to the Lord, who o'er all things so wondrously reigneth,\nShelters thee under His wings, yea, so gently sustaineth!\nHast thou not seen how thy desires e'er have been\nGranted in what He ordaineth?\n\nPraise to the Lord, who doth prosper thy work and defend thee;\nSurely His goodness and mercy here daily attend thee.\nPonder anew what the Almighty can do,\nIf with His love He befriend thee.\n\nPraise to the Lord, O let all that is in me adore Him!\nAll that hath life and breath, come now with praises before Him.\nLet the Amen sound from His people again,\nGladly for aye we adore Him."},
+  {n:2,t:"Come, Thou Almighty King",c:"praise",m:"6.6.4.6.6.6.4",
+   l:"Come, Thou Almighty King,\nHelp us Thy name to sing,\nHelp us to praise!\nFather, all-glorious,\nO'er all victorious,\nCome and reign over us,\nAncient of Days!\n\nCome, Thou Incarnate Word,\nGird on Thy mighty sword,\nOur prayer attend!\nCome, and Thy people bless,\nAnd give Thy Word success;\nSpirit of holiness,\nOn us descend!\n\nCome, Holy Comforter,\nThy sacred witness bear\nIn this glad hour.\nThou who almighty art,\nNow rule in every heart,\nNever from us depart,\nSpirit of pow'r!\n\nTo Thee, great One in Three,\nEternal praises be\nHence, evermore.\nThy sov'reign majesty\nMay we in glory see,\nAnd to eternity\nLove and adore!"},
+  {n:4,t:"All Hail the Power of Jesus' Name",c:"praise",m:"CM with repeat",
+   l:"All hail the pow'r of Jesus' name!\nLet angels prostrate fall;\nBring forth the royal diadem,\nAnd crown Him Lord of all.\nBring forth the royal diadem,\nAnd crown Him Lord of all!\n\nYe chosen seed of Israel's race,\nYe ransomed from the fall,\nHail Him who saves you by His grace,\nAnd crown Him Lord of all.\nHail Him who saves you by His grace,\nAnd crown Him Lord of all!\n\nLet every kindred, every tribe\nOn this terrestrial ball,\nTo Him all majesty ascribe,\nAnd crown Him Lord of all.\nTo Him all majesty ascribe,\nAnd crown Him Lord of all!\n\nO that with yonder sacred throng\nWe at His feet may fall!\nWe'll join the everlasting song,\nAnd crown Him Lord of all.\nWe'll join the everlasting song,\nAnd crown Him Lord of all!"},
+  {n:10,t:"O God, Our Help in Ages Past",c:"faith",m:"CM",
+   l:"O God, our help in ages past,\nOur hope for years to come,\nOur shelter from the stormy blast,\nAnd our eternal home!\n\nUnder the shadow of Thy throne\nThy saints have dwelt secure;\nSufficient is Thine arm alone,\nAnd our defense is sure.\n\nBefore the hills in order stood,\nOr earth received her frame,\nFrom everlasting Thou art God,\nTo endless years the same.\n\nA thousand ages in Thy sight\nAre like an evening gone,\nShort as the watch that ends the night\nBefore the rising sun.\n\nTime, like an ever-rolling stream,\nBears all its sons away;\nThey fly, forgotten, as a dream\nDies at the op'ning day.\n\nO God, our help in ages past,\nOur hope for years to come,\nBe Thou our guide while life shall last,\nAnd our eternal home."},
+  {n:14,t:"Holy, Holy, Holy",c:"praise",m:"11.12.12.10",
+   l:"Holy, holy, holy! Lord God Almighty!\nEarly in the morning our song shall rise to Thee;\nHoly, holy, holy! Merciful and mighty!\nGod in three Persons, blessèd Trinity!\n\nHoly, holy, holy! All the saints adore Thee,\nCasting down their golden crowns around the glassy sea;\nCherubim and seraphim falling down before Thee,\nWhich wert, and art, and evermore shalt be.\n\nHoly, holy, holy! Though the darkness hide Thee,\nThough the eye of sinful man Thy glory may not see;\nOnly Thou art holy; there is none beside Thee,\nPerfect in pow'r, in love, and purity.\n\nHoly, holy, holy! Lord God Almighty!\nAll Thy works shall praise Thy name, in earth, and sky, and sea;\nHoly, holy, holy! Merciful and mighty!\nGod in three Persons, blessèd Trinity!"},
+  {n:21,t:"Immortal, Invisible, God Only Wise",c:"praise",m:"11.11.11.11",
+   l:"Immortal, invisible, God only wise,\nIn light inaccessible hid from our eyes,\nMost blessèd, most glorious, the Ancient of Days,\nAlmighty, victorious, Thy great name we praise.\n\nUnreasting, unhasting, and silent as light,\nNor wanting, nor wasting, Thou rulest in might;\nThy justice like mountains high soaring above\nThy clouds which are fountains of goodness and love.\n\nTo all, life Thou givest, to both great and small;\nIn all life Thou livest, the true life of all;\nWe blossom and flourish as leaves on the tree,\nAnd wither and perish, but naught changeth Thee.\n\nGreat Father of glory, pure Father of light,\nThine angels adore Thee, all veiling their sight;\nAll laud we would render, O help us to see\n'Tis only the splendor of light hideth Thee."},
+  {n:26,t:"Joyful, Joyful, We Adore Thee",c:"praise",m:"8.7.8.7 D",
+   l:"Joyful, joyful, we adore Thee,\nGod of glory, Lord of love;\nHearts unfold like flow'rs before Thee,\nOp'ning to the sun above.\nMelt the clouds of sin and sadness;\nDrive the dark of doubt away;\nGiver of immortal gladness,\nFill us with the light of day!\n\nAll Thy works with joy surround Thee,\nEarth and heav'n reflect Thy rays,\nStars and angels sing around Thee,\nCenter of unbroken praise.\nField and forest, vale and mountain,\nFlow'ry meadow, flashing sea,\nSinging bird and flowing fountain\nCall us to rejoice in Thee.\n\nThou art giving and forgiving,\nEver blessing, ever blest,\nWell-spring of the joy of living,\nOcean depth of happy rest!\nThou our Father, Christ our Brother,\nAll who live in love are Thine;\nTeach us how to love each other,\nLift us to the joy divine.\n\nMortals, join the happy chorus,\nWhich the morning stars began;\nFather love is reigning o'er us,\nBrother love binds man to man.\nEver singing, march we onward,\nVictors in the midst of strife,\nJoyful music leads us sunward\nIn the triumph song of life."},
+  {n:57,t:"Blessed Assurance",c:"faith",m:"9.10.9.9 with refrain",
+   l:"Blessed assurance, Jesus is mine!\nO what a foretaste of glory divine!\nHeir of salvation, purchase of God,\nBorn of His Spirit, washed in His blood.\n\nThis is my story, this is my song,\nPraising my Savior all the day long;\nThis is my story, this is my song,\nPraising my Savior all the day long.\n\nPerfect submission, perfect delight,\nVisions of rapture now burst on my sight;\nAngels descending bring from above\nEchoes of mercy, whispers of love.\n\nThis is my story, this is my song,\nPraising my Savior all the day long;\nThis is my story, this is my song,\nPraising my Savior all the day long.\n\nPerfect submission, all is at rest,\nI in my Savior am happy and blest,\nWatching and waiting, looking above,\nFilled with His goodness, lost in His love.\n\nThis is my story, this is my song,\nPraising my Savior all the day long;\nThis is my story, this is my song,\nPraising my Savior all the day long."},
+  {n:67,t:"How Great Thou Art",c:"praise",m:"11.10.11.10 with refrain",
+   l:"O Lord my God! When I in awesome wonder\nConsider all the worlds Thy hands have made,\nI see the stars, I hear the rolling thunder,\nThy pow'r throughout the universe displayed.\n\nThen sings my soul, my Savior God, to Thee,\nHow great Thou art! How great Thou art!\nThen sings my soul, my Savior God, to Thee,\nHow great Thou art! How great Thou art!\n\nWhen through the woods and forest glades I wander\nAnd hear the birds sing sweetly in the trees,\nWhen I look down from lofty mountain grandeur\nAnd hear the brook, and feel the gentle breeze,\n\nThen sings my soul, my Savior God, to Thee,\nHow great Thou art! How great Thou art!\nThen sings my soul, my Savior God, to Thee,\nHow great Thou art! How great Thou art!\n\nAnd when I think that God, His Son not sparing,\nSent Him to die, I scarce can take it in,\nThat on the cross, my burden gladly bearing,\nHe bled and died to take away my sin.\n\nThen sings my soul, my Savior God, to Thee,\nHow great Thou art! How great Thou art!\nThen sings my soul, my Savior God, to Thee,\nHow great Thou art! How great Thou art!\n\nWhen Christ shall come with shout of acclamation\nAnd take me home, what joy shall fill my heart!\nThen I shall bow in humble adoration,\nAnd there proclaim, my God, how great Thou art!\n\nThen sings my soul, my Savior God, to Thee,\nHow great Thou art! How great Thou art!\nThen sings my soul, my Savior God, to Thee,\nHow great Thou art! How great Thou art!"},
+  {n:82,t:"Great Is Thy Faithfulness",c:"faith",m:"11.10.11.10 with refrain",
+   l:"Great is Thy faithfulness, O God my Father,\nThere is no shadow of turning with Thee;\nThou changest not, Thy compassions they fail not;\nAs Thou hast been Thou forever wilt be.\n\nGreat is Thy faithfulness! Great is Thy faithfulness!\nMorning by morning new mercies I see;\nAll I have needed Thy hand hath provided—\nGreat is Thy faithfulness, Lord, unto me!\n\nSummer and winter, and springtime and harvest,\nSun, moon and stars in their courses above,\nJoin with all nature in manifold witness\nTo Thy great faithfulness, mercy and love.\n\nGreat is Thy faithfulness! Great is Thy faithfulness!\nMorning by morning new mercies I see;\nAll I have needed Thy hand hath provided—\nGreat is Thy faithfulness, Lord, unto me!\n\nPardon for sin and a peace that endureth,\nThine own dear presence to cheer and to guide;\nStrength for today and bright hope for tomorrow,\nBlessings all mine, with ten thousand beside!\n\nGreat is Thy faithfulness! Great is Thy faithfulness!\nMorning by morning new mercies I see;\nAll I have needed Thy hand hath provided—\nGreat is Thy faithfulness, Lord, unto me!"},
+  {n:88,t:"A Mighty Fortress Is Our God",c:"faith",m:"8.7.8.7.6.6.6.6.7",
+   l:"A mighty fortress is our God,\nA bulwark never failing;\nOur helper He amid the flood\nOf mortal ills prevailing.\nFor still our ancient foe\nDoth seek to work us woe—\nHis craft and pow'r are great,\nAnd armed with cruel hate,\nOn earth is not his equal.\n\nDid we in our own strength confide,\nOur striving would be losing,\nWere not the right Man on our side,\nThe Man of God's own choosing.\nDost ask who that may be?\nChrist Jesus, it is He—\nLord Sabaoth His name,\nFrom age to age the same,\nAnd He must win the battle.\n\nAnd though this world, with devils filled,\nShould threaten to undo us,\nWe will not fear, for God hath willed\nHis truth to triumph through us.\nThe prince of darkness grim,\nWe tremble not for him—\nHis rage we can endure,\nFor lo! his doom is sure;\nOne little word shall fell him.\n\nThat word above all earthly pow'rs,\nNo thanks to them, abideth;\nThe Spirit and the gifts are ours\nThrough Him who with us sideth.\nLet goods and kindred go,\nThis mortal life also;\nThe body they may kill:\nGod's truth abideth still,\nHis kingdom is forever."},
+  {n:100,t:"To God Be the Glory",c:"praise",m:"11.11.11.11 with refrain",
+   l:"To God be the glory, great things He hath taught us,\nGreat things He hath done, and great our rejoicing\nThrough Jesus the Son; but purer and higher\nAnd greater will be our wonder, our transport,\nWhen Jesus we see.\n\nPraise the Lord, praise the Lord,\nLet the earth hear His voice!\nPraise the Lord, praise the Lord,\nLet the people rejoice!\nO come to the Father, through Jesus the Son,\nAnd give Him the glory, great things He hath done!\n\nO perfect redemption, the purchase of blood,\nTo every believer the promise of God;\nThe vilest offender who truly believes,\nThat moment from Jesus a pardon receives.\n\nPraise the Lord, praise the Lord,\nLet the earth hear His voice!\nPraise the Lord, praise the Lord,\nLet the people rejoice!\nO come to the Father, through Jesus the Son,\nAnd give Him the glory, great things He hath done!\n\nGreat things He hath taught us, great things He hath done,\nAnd great our rejoicing through Jesus the Son;\nBut purer, and higher, and greater will be\nOur wonder, our transport, when Jesus we see.\n\nPraise the Lord, praise the Lord,\nLet the earth hear His voice!\nPraise the Lord, praise the Lord,\nLet the people rejoice!\nO come to the Father, through Jesus the Son,\nAnd give Him the glory, great things He hath done!"},
+  {n:108,t:"Amazing Grace",c:"faith",m:"CM",
+   l:"Amazing grace! how sweet the sound,\nThat saved a wretch like me!\nI once was lost, but now am found,\nWas blind, but now I see.\n\n'Twas grace that taught my heart to fear,\nAnd grace my fears relieved;\nHow precious did that grace appear\nThe hour I first believed.\n\nThrough many dangers, toils, and snares,\nI have already come;\n'Tis grace hath brought me safe thus far,\nAnd grace will lead me home.\n\nWhen we've been there ten thousand years,\nBright shining as the sun,\nWe've no less days to sing God's praise\nThan when we'd first begun."},
+  {n:112,t:"Jesus Loves Me",c:"faith",m:"7.7.7.7 with refrain",
+   l:"Jesus loves me! this I know,\nFor the Bible tells me so;\nLittle ones to Him belong;\nThey are weak, but He is strong.\n\nYes, Jesus loves me!\nYes, Jesus loves me!\nYes, Jesus loves me!\nThe Bible tells me so.\n\nJesus loves me! He who died\nHeaven's gate to open wide;\nHe will wash away my sin,\nLet His little child come in.\n\nYes, Jesus loves me!\nYes, Jesus loves me!\nYes, Jesus loves me!\nThe Bible tells me so.\n\nJesus loves me! He will stay\nClose beside me all the way;\nThou hast bled and died for me,\nI will henceforth live for Thee.\n\nYes, Jesus loves me!\nYes, Jesus loves me!\nYes, Jesus loves me!\nThe Bible tells me so."},
+  {n:118,t:"When Morning Gilds the Skies",c:"praise",m:"6.6.6.6 D",
+   l:"When morning gilds the skies,\nMy heart awaking cries,\nMay Jesus Christ be praised!\nAlike at work and prayer\nTo Jesus I repair;\nMay Jesus Christ be praised!\n\nWhen sleep her balm denies,\nMy silent spirit sighs,\nMay Jesus Christ be praised!\nWhen evil thoughts molest,\nWith this I shield my breast,\nMay Jesus Christ be praised!\n\nDoes sadness fill my mind?\nA solace here I find,\nMay Jesus Christ be praised!\nOr fades my earthly bliss?\nMy comfort still is this,\nMay Jesus Christ be praised!\n\nIn heav'n's eternal bliss\nThe loveliest strain is this,\nMay Jesus Christ be praised!\nThe powers of darkness fear,\nWhen this sweet chant they hear,\nMay Jesus Christ be praised!"},
+  {n:131,t:"I Love to Tell the Story",c:"service",m:"7.6.7.6 D with refrain",
+   l:"I love to tell the story\nOf unseen things above,\nOf Jesus and His glory,\nOf Jesus and His love.\nI love to tell the story,\nBecause I know 'tis true;\nIt satisfies my longings\nAs nothing else can do.\n\nI love to tell the story,\n'Twill be my theme in glory,\nTo tell the old, old story\nOf Jesus and His love.\n\nI love to tell the story;\nMore wonderful it seems\nThan all the golden fancies\nOf all our golden dreams.\nI love to tell the story,\nIt did so much for me;\nAnd that is just the reason\nI tell it now to thee.\n\nI love to tell the story,\n'Twill be my theme in glory,\nTo tell the old, old story\nOf Jesus and His love.\n\nI love to tell the story;\n'Tis pleasant to repeat\nWhat seems, each time I tell it,\nMore wonderfully sweet.\nI love to tell the story,\nFor some have never heard\nThe message of salvation\nFrom God's own holy Word.\n\nI love to tell the story,\n'Twill be my theme in glory,\nTo tell the old, old story\nOf Jesus and His love.\n\nI love to tell the story,\nFor those who know it best\nSeem hungering and thirsting\nTo hear it like the rest.\nAnd when, in scenes of glory,\nI sing the new, new song,\n'Twill be the old, old story\nThat I have loved so long.\n\nI love to tell the story,\n'Twill be my theme in glory,\nTo tell the old, old story\nOf Jesus and His love."},
+  {n:153,t:"What a Friend We Have in Jesus",c:"prayer",m:"8.7.8.7 D",
+   l:"What a friend we have in Jesus,\nAll our sins and griefs to bear!\nWhat a privilege to carry\nEverything to God in prayer!\nO what peace we often forfeit,\nO what needless pain we bear,\nAll because we do not carry\nEverything to God in prayer.\n\nHave we trials and temptations?\nIs there trouble anywhere?\nWe should never be discouraged—\nTake it to the Lord in prayer.\nCan we find a friend so faithful\nWho will all our sorrows share?\nJesus knows our every weakness—\nTake it to the Lord in prayer.\n\nAre we weak and heavy-laden,\nCumbered with a load of care?\nPrecious Savior, still our refuge—\nTake it to the Lord in prayer.\nDo thy friends despise, forsake thee?\nTake it to the Lord in prayer;\nIn His arms He'll take and shield thee,\nThou wilt find a solace there."},
+  {n:175,t:"Turn Your Eyes Upon Jesus",c:"faith",m:"8.10.10 with refrain",
+   l:"O soul, are you weary and troubled?\nNo light in the darkness you see?\nThere's light for a look at the Savior,\nAnd life more abundant and free!\n\nTurn your eyes upon Jesus,\nLook full in His wonderful face,\nAnd the things of earth will grow strangely dim,\nIn the light of His glory and grace.\n\nThrough death into life everlasting\nHe passed, and we follow Him there;\nO'er us sin no more hath dominion—\nFor more than conquerors we are!\n\nTurn your eyes upon Jesus,\nLook full in His wonderful face,\nAnd the things of earth will grow strangely dim,\nIn the light of His glory and grace.\n\nHis Word shall not fail you—He promised;\nBelieve Him and all will be well:\nThen go to a world that is dying,\nHis perfect salvation to tell!\n\nTurn your eyes upon Jesus,\nLook full in His wonderful face,\nAnd the things of earth will grow strangely dim,\nIn the light of His glory and grace."},
+  {n:184,t:"Jesus, the Very Thought of Thee",c:"faith",m:"CM",
+   l:"Jesus, the very thought of Thee\nWith sweetness fills my breast;\nBut sweeter far Thy face to see,\nAnd in Thy presence rest.\n\nNor voice can sing, nor heart can frame,\nNor can the mem'ry find\nA sweeter sound than Thy blest name,\nO Savior of mankind!\n\nO hope of every contrite heart,\nO joy of all the meek,\nTo those who fall, how kind Thou art!\nHow good to those who seek!\n\nBut what to those who find? Ah, this\nNor tongue nor pen can show;\nThe love of Jesus, what it is\nNone but His loved ones know.\n\nJesus, our only joy be Thou,\nAs Thou our prize wilt be;\nJesus, be Thou our glory now,\nAnd through eternity."},
+  {n:195,t:"Come, Thou Fount of Every Blessing",c:"praise",m:"8.7.8.7 D",
+   l:"Come, Thou Fount of every blessing,\nTune my heart to sing Thy grace;\nStreams of mercy, never ceasing,\nCall for songs of loudest praise.\nTeach me some melodious sonnet,\nSung by flaming tongues above;\nPraise the mount! I'm fixed upon it,\nMount of Thy redeeming love.\n\nHere I raise my Ebenezer;\nHither by Thy help I'm come;\nAnd I hope, by Thy good pleasure,\nSafely to arrive at home.\nJesus sought me when a stranger,\nWand'ring from the fold of God;\nHe, to rescue me from danger,\nInterposed His precious blood.\n\nO to grace how great a debtor\nDaily I'm constrained to be!\nLet Thy goodness, like a fetter,\nBind my wand'ring heart to Thee:\nProne to wander, Lord, I feel it,\nProne to leave the God I love;\nHere's my heart, O take and seal it,\nSeal it for Thy courts above."},
+  {n:204,t:"Rock of Ages",c:"comfort",m:"7.7.7.7.7.7",
+   l:"Rock of Ages, cleft for me,\nLet me hide myself in Thee;\nLet the water and the blood,\nFrom Thy wounded side which flowed,\nBe of sin the double cure,\nSave from wrath and make me pure.\n\nNot the labors of my hands\nCan fulfill Thy law's demands;\nCould my zeal no respite know,\nCould my tears forever flow,\nAll for sin could not atone;\nThou must save, and Thou alone.\n\nNothing in my hand I bring,\nSimply to the cross I cling;\nNaked, come to Thee for dress;\nHelpless, look to Thee for grace;\nFoul, I to the fountain fly;\nWash me, Savior, or I die.\n\nWhile I draw this fleeting breath,\nWhen mine eyes shall close in death,\nWhen I rise to worlds unknown,\nAnd behold Thee on Thy throne,\nRock of Ages, cleft for me,\nLet me hide myself in Thee."},
+  {n:214,t:"In the Cross of Christ I Glory",c:"praise",m:"8.7.8.7",
+   l:"In the cross of Christ I glory,\nTow'ring o'er the wrecks of time;\nAll the light of sacred story\nGathers round its head sublime.\n\nWhen the woes of life o'ertake me,\nHopes deceive, and fears annoy,\nNever shall the cross forsake me:\nLo! it glows with peace and joy.\n\nWhen the sun of bliss is beaming\nLight and love upon my way,\nFrom the cross the radiance streaming\nAdds more luster to the day.\n\nBane and blessing, pain and pleasure,\nBy the cross are sanctified;\nPeace is there that knows no measure,\nJoys that through all time abide.\n\nIn the cross of Christ I glory,\nTow'ring o'er the wrecks of time;\nAll the light of sacred story\nGathers round its head sublime."},
+  {n:228,t:"Near the Cross",c:"faith",m:"7.6.7.6 with refrain",
+   l:"Jesus, keep me near the cross,\nThere a precious fountain\nFree to all — a healing stream —\nFlows from Calvary's mountain.\n\nIn the cross, in the cross,\nBe my glory ever;\nTill my raptured soul shall find\nRest beyond the river.\n\nNear the cross, a trembling soul,\nLove and mercy found me;\nThere the bright and morning star\nSheds its beams around me.\n\nIn the cross, in the cross,\nBe my glory ever;\nTill my raptured soul shall find\nRest beyond the river.\n\nNear the cross! O Lamb of God,\nBring its scenes before me;\nHelp my walk from day to day,\nWith its shadow o'er me.\n\nIn the cross, in the cross,\nBe my glory ever;\nTill my raptured soul shall find\nRest beyond the river.\n\nNear the cross I'll watch and wait,\nHoping, trusting ever,\nTill I reach the golden strand,\nJust beyond the river.\n\nIn the cross, in the cross,\nBe my glory ever;\nTill my raptured soul shall find\nRest beyond the river."},
+  {n:260,t:"He Lives",c:"faith",m:"Irregular with refrain",
+   l:"I serve a risen Savior,\nHe's in the world today;\nI know that He is living,\nWhatever men may say;\nI see His hand of mercy,\nI hear His voice of cheer,\nAnd just the time I need Him\nHe's always near.\n\nHe lives, He lives, Christ Jesus lives today!\nHe walks with me and talks with me\nAlong life's narrow way.\nHe lives, He lives, salvation to impart!\nYou ask me how I know He lives?\nHe lives within my heart.\n\nIn all the world around me\nI see His loving care,\nAnd though my heart grows weary\nI never will despair;\nI know that He is leading\nThrough all the stormy blast,\nThe day of His appearing\nWill come at last.\n\nHe lives, He lives, Christ Jesus lives today!\nHe walks with me and talks with me\nAlong life's narrow way.\nHe lives, He lives, salvation to impart!\nYou ask me how I know He lives?\nHe lives within my heart.\n\nRejoice, rejoice, O Christian,\nLift up your voice and sing\nEternal hallelujahs\nTo Jesus Christ the King!\nThe hope of all who seek Him,\nThe help of all who find,\nNone other is so loving,\nSo good and kind.\n\nHe lives, He lives, Christ Jesus lives today!\nHe walks with me and talks with me\nAlong life's narrow way.\nHe lives, He lives, salvation to impart!\nYou ask me how I know He lives?\nHe lives within my heart."},
+  {n:272,t:"In Christ Alone",c:"faith",m:"Irregular",
+   l:"In Christ alone my hope is found;\nHe is my light, my strength, my song;\nThis cornerstone, this solid ground,\nFirm through the fiercest drought and storm.\nWhat heights of love, what depths of peace,\nWhen fears are stilled, when strivings cease!\nMy comforter, my all in all—\nHere in the love of Christ I stand.\n\nIn Christ alone, who took on flesh,\nFullness of God in helpless babe!\nThis gift of love and righteousness,\nScorned by the ones He came to save.\nTill on that cross as Jesus died,\nThe wrath of God was satisfied;\nFor ev'ry sin on Him was laid—\nHere in the death of Christ I live.\n\nThere in the ground His body lay,\nLight of the world by darkness slain;\nThen bursting forth in glorious day,\nUp from the grave He rose again!\nAnd as He stands in victory,\nSin's curse has lost its grip on me;\nFor I am His and He is mine—\nBought with the precious blood of Christ.\n\nNo guilt in life, no fear in death—\nThis is the pow'r of Christ in me;\nFrom life's first cry to final breath,\nJesus commands my destiny.\nNo pow'r of hell, no scheme of man,\nCan ever pluck me from His hand;\nTill He returns or calls me home—\nHere in the pow'r of Christ I'll stand!"},
+  {n:295,t:"The Solid Rock",c:"faith",m:"LM with refrain",
+   l:"My hope is built on nothing less\nThan Jesus' blood and righteousness;\nI dare not trust the sweetest frame,\nBut wholly lean on Jesus' name.\n\nOn Christ, the solid Rock, I stand;\nAll other ground is sinking sand,\nAll other ground is sinking sand.\n\nWhen darkness veils His lovely face,\nI rest on His unchanging grace;\nIn ev'ry high and stormy gale,\nMy anchor holds within the veil.\n\nOn Christ, the solid Rock, I stand;\nAll other ground is sinking sand,\nAll other ground is sinking sand.\n\nHis oath, His covenant, His blood\nSupport me in the whelming flood;\nWhen all around my soul gives way,\nHe then is all my hope and stay.\n\nOn Christ, the solid Rock, I stand;\nAll other ground is sinking sand,\nAll other ground is sinking sand.\n\nWhen He shall come with trumpet sound,\nO may I then in Him be found,\nDressed in His righteousness alone,\nFaultless to stand before the throne.\n\nOn Christ, the solid Rock, I stand;\nAll other ground is sinking sand,\nAll other ground is sinking sand."},
+  {n:313,t:"O Happy Day",c:"faith",m:"LM with refrain",
+   l:"O happy day, that fixed my choice\nOn Thee, my Savior and my God!\nWell may this glowing heart rejoice,\nAnd tell its raptures all abroad.\n\nHappy day, happy day,\nWhen Jesus washed my sins away!\nHe taught me how to watch and pray,\nAnd live rejoicing every day;\nHappy day, happy day,\nWhen Jesus washed my sins away!\n\nO happy bond, that seals my vows\nTo Him who merits all my love!\nLet cheerful anthems fill His house,\nWhile to that sacred shrine I move.\n\nHappy day, happy day,\nWhen Jesus washed my sins away!\nHe taught me how to watch and pray,\nAnd live rejoicing every day;\nHappy day, happy day,\nWhen Jesus washed my sins away!\n\n'Tis done, the great transaction's done;\nI am my Lord's, and He is mine;\nHe drew me, and I followed on,\nCharmed to confess the voice divine.\n\nHappy day, happy day,\nWhen Jesus washed my sins away!\nHe taught me how to watch and pray,\nAnd live rejoicing every day;\nHappy day, happy day,\nWhen Jesus washed my sins away!"},
+  {n:330,t:"Take My Life and Let It Be",c:"service",m:"7.7.7.7 D",
+   l:"Take my life and let it be\nConsecrated, Lord, to Thee;\nTake my moments and my days,\nLet them flow in ceaseless praise.\n\nTake my hands and let them move\nAt the impulse of Thy love;\nTake my feet and let them be\nSwift and beautiful for Thee.\n\nTake my voice and let me sing\nAlways, only, for my King;\nTake my lips and let them be\nFilled with messages from Thee.\n\nTake my silver and my gold,\nNot a mite would I withhold;\nTake my intellect and use\nEv'ry pow'r as Thou shalt choose.\n\nTake my will and make it Thine,\nIt shall be no longer mine;\nTake my heart, it is Thine own,\nIt shall be Thy royal throne.\n\nTake my love, my Lord, I pour\nAt Thy feet its treasure store;\nTake myself and I will be\nEver, only, all for Thee."},
+  {n:341,t:"Have Thine Own Way, Lord",c:"prayer",m:"5.4.5.4 D",
+   l:"Have Thine own way, Lord! Have Thine own way!\nThou art the Potter, I am the clay.\nMold me and make me after Thy will,\nWhile I am waiting, yielded and still.\n\nHave Thine own way, Lord! Have Thine own way!\nSearch me and try me, Master, today!\nWhiter than snow, Lord, wash me just now,\nAs in Thy presence humbly I bow.\n\nHave Thine own way, Lord! Have Thine own way!\nHold o'er my being absolute sway!\nFill with Thy Spirit till all shall see\nChrist only, always, living in me.\n\nHave Thine own way, Lord! Have Thine own way!\nThou art the Potter, I am the clay.\nMold me and make me after Thy will,\nWhile I am waiting, yielded and still."},
+  {n:355,t:"Spirit of God, Descend Upon My Heart",c:"prayer",m:"10.10.10.10",
+   l:"Spirit of God, descend upon my heart;\nWean it from earth, through all its pulses move;\nStoop to my weakness, mighty as Thou art,\nAnd make me love Thee as I ought to love.\n\nI ask no dream, no prophet ecstasies,\nNo sudden rending of the veil of clay,\nNo angel visitant, no op'ning skies;\nBut take the dimness of my soul away.\n\nHast Thou not bid me love Thee, God and King?\nAll, all Thine own, soul, heart and strength and mind;\nI see Thy cross — there teach my heart to cling:\nO let me seek Thee, and O let me find!\n\nTeach me to feel that Thou art always nigh;\nTeach me the struggles of the soul to bear,\nTo check the rising doubt, the rebel sigh;\nTeach me the patience of unanswered prayer.\n\nTeach me to love Thee as Thine angels love,\nOne holy passion filling all my frame;\nThe baptism of the heav'n-descended Dove,\nMy heart an altar, and Thy love the flame."},
+  {n:390,t:"Leaning on the Everlasting Arms",c:"comfort",m:"10.9.10.9 with refrain",
+   l:"What a fellowship, what a joy divine,\nLeaning on the everlasting arms;\nWhat a blessedness, what a peace is mine,\nLeaning on the everlasting arms.\n\nLeaning, leaning, safe and secure from all alarms;\nLeaning, leaning, leaning on the everlasting arms.\n\nO how sweet to walk in this pilgrim way,\nLeaning on the everlasting arms;\nO how bright the path grows from day to day,\nLeaning on the everlasting arms.\n\nLeaning, leaning, safe and secure from all alarms;\nLeaning, leaning, leaning on the everlasting arms.\n\nWhat have I to dread, what have I to fear,\nLeaning on the everlasting arms?\nI have blessèd peace with my Lord so near,\nLeaning on the everlasting arms.\n\nLeaning, leaning, safe and secure from all alarms;\nLeaning, leaning, leaning on the everlasting arms."},
+  {n:404,t:"This Little Light of Mine",c:"service",m:"Irregular",
+   l:"This little light of mine, I'm gonna let it shine,\nThis little light of mine, I'm gonna let it shine,\nThis little light of mine, I'm gonna let it shine,\nLet it shine, let it shine, let it shine.\n\nHide it under a bushel? No! I'm gonna let it shine,\nHide it under a bushel? No! I'm gonna let it shine,\nHide it under a bushel? No! I'm gonna let it shine,\nLet it shine, let it shine, let it shine.\n\nDon't let Satan blow it out, I'm gonna let it shine,\nDon't let Satan blow it out, I'm gonna let it shine,\nDon't let Satan blow it out, I'm gonna let it shine,\nLet it shine, let it shine, let it shine.\n\nLet it shine till Jesus comes, I'm gonna let it shine,\nLet it shine till Jesus comes, I'm gonna let it shine,\nLet it shine till Jesus comes, I'm gonna let it shine,\nLet it shine, let it shine, let it shine."},
+  {n:414,t:"Stand Up, Stand Up for Jesus",c:"service",m:"7.6.7.6 D",
+   l:"Stand up, stand up for Jesus,\nYe soldiers of the cross;\nLift high His royal banner,\nIt must not suffer loss.\nFrom vict'ry unto vict'ry\nHis army shall He lead,\nTill every foe is vanquished,\nAnd Christ is Lord indeed.\n\nStand up, stand up for Jesus,\nThe trumpet call obey;\nForth to the mighty conflict,\nIn this His glorious day.\nYe that are men now serve Him\nAgainst unnumbered foes;\nLet courage rise with danger,\nAnd strength to strength oppose.\n\nStand up, stand up for Jesus,\nStand in His strength alone;\nThe arm of flesh will fail you,\nYe dare not trust your own.\nPut on the gospel armor,\nEach piece put on with prayer;\nWhere duty calls or danger,\nBe never wanting there.\n\nStand up, stand up for Jesus,\nThe strife will not be long;\nThis day the noise of battle,\nThe next the victor's song.\nTo him that overcometh,\nA crown of life shall be;\nHe with the King of glory\nShall reign eternally."},
+  {n:426,t:"Onward, Christian Soldiers",c:"service",m:"6.5.6.5 D with refrain",
+   l:"Onward, Christian soldiers,\nMarching as to war,\nWith the cross of Jesus\nGoing on before.\nChrist, the royal Master,\nLeads against the foe;\nForward into battle\nSee His banners go!\n\nOnward, Christian soldiers,\nMarching as to war,\nWith the cross of Jesus\nGoing on before.\n\nAt the sign of triumph\nSatan's legions flee;\nOn then, Christian soldiers,\nOn to victory!\nHell's foundations quiver\nAt the shout of praise;\nBrothers, lift your voices,\nLoud your anthems raise.\n\nOnward, Christian soldiers,\nMarching as to war,\nWith the cross of Jesus\nGoing on before.\n\nLike a mighty army\nMoves the Church of God;\nBrothers, we are treading\nWhere the saints have trod.\nWe are not divided,\nAll one body we,\nOne in hope and doctrine,\nOne in charity.\n\nOnward, Christian soldiers,\nMarching as to war,\nWith the cross of Jesus\nGoing on before."},
+  {n:438,t:"Sweet Hour of Prayer",c:"prayer",m:"LMD",
+   l:"Sweet hour of prayer! sweet hour of prayer!\nThat calls me from a world of care,\nAnd bids me at my Father's throne\nMake all my wants and wishes known.\nIn seasons of distress and grief,\nMy soul has often found relief,\nAnd oft escaped the tempter's snare,\nBy thy return, sweet hour of prayer!\n\nSweet hour of prayer! sweet hour of prayer!\nThe joys I feel, the bliss I share,\nOf those whose anxious spirits burn\nWith strong desires for thy return!\nWith such I hasten to the place\nWhere God my Savior shows His face,\nAnd gladly take my station there,\nAnd wait for thee, sweet hour of prayer!\n\nSweet hour of prayer! sweet hour of prayer!\nThy wings shall my petition bear\nTo Him whose truth and faithfulness\nEngage the waiting soul to bless.\nAnd since He bids me seek His face,\nBelieve His Word and trust His grace,\nI'll cast on Him my every care,\nAnd wait for thee, sweet hour of prayer!"},
+  {n:457,t:"Lord, I Want to Be a Christian",c:"service",m:"Irregular",
+   l:"Lord, I want to be a Christian\nIn my heart, in my heart;\nLord, I want to be a Christian\nIn my heart.\n\nIn my heart, in my heart,\nLord, I want to be a Christian\nIn my heart.\n\nLord, I want to be more loving\nIn my heart, in my heart;\nLord, I want to be more loving\nIn my heart.\n\nIn my heart, in my heart,\nLord, I want to be more loving\nIn my heart.\n\nLord, I want to be more holy\nIn my heart, in my heart;\nLord, I want to be more holy\nIn my heart.\n\nIn my heart, in my heart,\nLord, I want to be more holy\nIn my heart.\n\nLord, I want to be like Jesus\nIn my heart, in my heart;\nLord, I want to be like Jesus\nIn my heart.\n\nIn my heart, in my heart,\nLord, I want to be like Jesus\nIn my heart."},
+  {n:462,t:"Softly and Tenderly",c:"comfort",m:"11.7.11.7 with refrain",
+   l:"Softly and tenderly Jesus is calling,\nCalling for you and for me;\nSee, on the portals He's waiting and watching,\nWatching for you and for me.\n\nCome home, come home,\nYe who are weary come home;\nEarnestly, tenderly, Jesus is calling,\nCalling, O sinner, come home!\n\nWhy should we tarry when Jesus is pleading,\nPleading for you and for me?\nWhy should we linger and heed not His mercies,\nMercies for you and for me?\n\nCome home, come home,\nYe who are weary come home;\nEarnestly, tenderly, Jesus is calling,\nCalling, O sinner, come home!\n\nTime is now fleeting, the moments are passing,\nPassing from you and from me;\nShadows are gathering, death's night is coming,\nComing for you and for me.\n\nCome home, come home,\nYe who are weary come home;\nEarnestly, tenderly, Jesus is calling,\nCalling, O sinner, come home!\n\nO for the wonderful love He has promised,\nPromised for you and for me!\nTho' we have sinned, He has mercy and pardon,\nPardon for you and for me.\n\nCome home, come home,\nYe who are weary come home;\nEarnestly, tenderly, Jesus is calling,\nCalling, O sinner, come home!"},
+  {n:478,t:"It Is Well with My Soul",c:"comfort",m:"11.8.11.9 with refrain",
+   l:"When peace like a river attendeth my way,\nWhen sorrows like sea billows roll;\nWhatever my lot, Thou hast taught me to say,\nIt is well, it is well with my soul.\n\nIt is well with my soul,\nIt is well, it is well with my soul.\n\nThough Satan should buffet, though trials should come,\nLet this blest assurance control,\nThat Christ hath regarded my helpless estate,\nAnd hath shed His own blood for my soul.\n\nIt is well with my soul,\nIt is well, it is well with my soul.\n\nMy sin — O the bliss of this glorious thought —\nMy sin, not in part, but the whole\nIs nailed to the cross and I bear it no more,\nPraise the Lord, praise the Lord, O my soul!\n\nIt is well with my soul,\nIt is well, it is well with my soul.\n\nAnd, Lord, haste the day when my faith shall be sight,\nThe clouds be rolled back as a scroll,\nThe trump shall resound, and the Lord shall descend,\nEven so, it is well with my soul.\n\nIt is well with my soul,\nIt is well, it is well with my soul."},
+  {n:493,t:"Nearer, My God, to Thee",c:"prayer",m:"6.4.6.4.6.6.6.4",
+   l:"Nearer, my God, to Thee,\nNearer to Thee!\nE'en though it be a cross\nThat raiseth me;\nStill all my song shall be,\nNearer, my God, to Thee,\nNearer, my God, to Thee,\nNearer to Thee!\n\nThough like the wanderer,\nThe sun gone down,\nDarkness be over me,\nMy rest a stone;\nYet in my dreams I'd be\nNearer, my God, to Thee,\nNearer, my God, to Thee,\nNearer to Thee!\n\nThere let the way appear,\nSteps unto heav'n;\nAll that Thou sendest me\nIn mercy giv'n;\nAngels to beckon me\nNearer, my God, to Thee,\nNearer, my God, to Thee,\nNearer to Thee!\n\nThen, with my waking thoughts\nBright with Thy praise,\nOut of my stony griefs\nBethel I'll raise;\nSo by my woes to be\nNearer, my God, to Thee,\nNearer, my God, to Thee,\nNearer to Thee!\n\nOr if, on joyful wing\nCleaving the sky,\nSun, moon, and stars forgot,\nUpward I fly,\nStill all my song shall be,\nNearer, my God, to Thee,\nNearer, my God, to Thee,\nNearer to Thee!"},
+  {n:507,t:"Guide Me, O Thou Great Jehovah",c:"faith",m:"8.7.8.7.8.7",
+   l:"Guide me, O Thou great Jehovah,\nPilgrim through this barren land;\nI am weak, but Thou art mighty,\nHold me with Thy pow'rful hand;\nBread of heaven, Bread of heaven,\nFeed me till I want no more,\nFeed me till I want no more.\n\nOpen now the crystal fountain,\nWhence the healing stream doth flow;\nLet the fire and cloudy pillar\nLead me all my journey through;\nStrong Deliv'rer, Strong Deliv'rer,\nBe Thou still my strength and shield,\nBe Thou still my strength and shield.\n\nWhen I tread the verge of Jordan,\nBid my anxious fears subside;\nDeath of death, and hell's Destruction,\nLand me safe on Canaan's side;\nSongs of praises, songs of praises,\nI will ever give to Thee,\nI will ever give to Thee."},
+  {n:524,t:"It Came Upon the Midnight Clear",c:"advent",m:"CMD",
+   l:"It came upon the midnight clear,\nThat glorious song of old,\nFrom angels bending near the earth\nTo touch their harps of gold:\n'Peace on the earth, good will to men,\nFrom heaven's all-gracious King!'\nThe world in solemn stillness lay\nTo hear the angels sing.\n\nStill through the cloven skies they come\nWith peaceful wings unfurled,\nAnd still their heavenly music floats\nO'er all the weary world;\nAbove its sad and lowly plains\nThey bend on hovering wing,\nAnd ever o'er its Babel sounds\nThe blessèd angels sing.\n\nAnd ye, beneath life's crushing load,\nWhose forms are bending low,\nWho toil along the climbing way\nWith painful steps and slow,\nLook now! for glad and golden hours\nCome swiftly on the wing:\nO rest beside the weary road\nAnd hear the angels sing.\n\nFor lo! the days are hastening on,\nBy prophet bards foretold,\nWhen with the ever-circling years\nComes round the age of gold;\nWhen peace shall over all the earth\nIts ancient splendors fling,\nAnd the whole world give back the song\nWhich now the angels sing."},
+  {n:536,t:"Lo, He Comes with Clouds Descending",c:"advent",m:"8.7.8.7.4.7",
+   l:"Lo! He comes with clouds descending,\nOnce for favored sinners slain;\nThousand thousand saints attending\nSwell the triumph of His train:\nHallelujah! Hallelujah! Hallelujah!\nGod appears on earth to reign.\n\nEvery eye shall now behold Him\nRobed in dreadful majesty;\nThose who set at naught and sold Him,\nPierced and nailed Him to the tree,\nDeeply wailing, deeply wailing, deeply wailing,\nShall the true Messiah see.\n\nThe dear tokens of His passion\nStill His dazzling body bears;\nCause of endless exultation\nTo His ransomed worshipers:\nWith what rapture, with what rapture, with what rapture\nGaze we on those glorious scars!\n\nYea, Amen! let all adore Thee,\nHigh on Thine eternal throne;\nSavior, take the pow'r and glory,\nClaim the kingdom for Thine own:\nO come quickly, O come quickly, O come quickly,\nHallelujah! Come, Lord, come!"},
+  {n:541,t:"Jesus Is Coming Again",c:"advent",m:"Irregular with refrain",
+   l:"Lift up the trumpet and loud let it ring,\nJesus is coming again!\nCheer up, ye pilgrims, be joyful and sing,\nJesus is coming again!\n\nComing again, coming again,\nJesus is coming again!\n\nEchoes from Calvary, valley and hill,\nJesus is coming again!\nWhisper, O whisper the glad message still,\nJesus is coming again!\n\nComing again, coming again,\nJesus is coming again!\n\nWatchers and waiters, lift up your weary head,\nJesus is coming again!\nCheer up, ye weeping ones, dry all your tears,\nJesus is coming again!\n\nComing again, coming again,\nJesus is coming again!\n\nNations are angry—by this we may know,\nJesus is coming again!\nKnowledge increases, men run to and fro,\nJesus is coming again!\n\nComing again, coming again,\nJesus is coming again!"},
+  {n:551,t:"We Have This Hope",c:"advent",m:"6.6.7.6.6.7 with refrain",
+   l:"We have this hope that burns within our hearts,\nHope in the coming of the Lord.\nWe have this faith that Christ alone imparts,\nFaith in the promise of His Word.\n\nWe believe the time is here,\nWhen the nations far and near\nShall awake and shout and sing\nHallelujah! Christ is King!\n\nWe have this hope that burns within our hearts,\nHope in the coming of the Lord.\n\nWe have this hope that's anchored in God's love,\nHope in the grace that He has shown.\nWe have this hope — our Savior reigns above,\nSoon He will claim us as His own.\n\nWe believe the time is here,\nWhen the nations far and near\nShall awake and shout and sing\nHallelujah! Christ is King!\n\nWe have this hope that burns within our hearts,\nHope in the coming of the Lord."},
+  {n:568,t:"Watch, Ye Saints",c:"advent",m:"Irregular",
+   l:"Watch, ye saints, with eyelids waking;\nLo! the powers of heav'n are shaking!\nKeep your lamps all trimmed and burning,\nReady for your Lord's returning.\n\nLo! He comes, lo! Jesus comes;\nLo! He comes, He comes all glorious!\nJesus comes to reign victorious,\nLo! He comes, yes, Jesus comes!\n\nWorlds in ruin shall await Him;\nIsrael's tribes shall look and greet Him;\nGlory, glory, glory, glory,\nEarthwide shouts His coming story.\n\nLo! He comes, lo! Jesus comes;\nLo! He comes, He comes all glorious!\nJesus comes to reign victorious,\nLo! He comes, yes, Jesus comes!"},
+  {n:593,t:"This Is My Father's World",c:"praise",m:"SMD",
+   l:"This is my Father's world,\nAnd to my list'ning ears\nAll nature sings, and round me rings\nThe music of the spheres.\nThis is my Father's world:\nI rest me in the thought\nOf rocks and trees, of skies and seas—\nHis hand the wonders wrought.\n\nThis is my Father's world,\nThe birds their carols raise,\nThe morning light, the lily white,\nDeclare their Maker's praise.\nThis is my Father's world:\nHe shines in all that's fair;\nIn the rustling grass I hear Him pass,\nHe speaks to me everywhere.\n\nThis is my Father's world,\nO let me ne'er forget\nThat though the wrong seems oft so strong,\nGod is the Ruler yet.\nThis is my Father's world:\nWhy should my heart be sad?\nThe Lord is King: let the heavens ring!\nGod reigns; let earth be glad!"},
+  {n:602,t:"O Brother, Be Faithful",c:"service",m:"10.9.10.9 with refrain",
+   l:"O brother, be faithful! soon Jesus will come,\nFor whom we have waited so long;\nO, soon we shall enter our glorious home,\nAnd join in the conqueror's song.\n\nO, be faithful, be faithful,\nThe great and the small must appear;\nAnd the faithful in Christ will be welcomed with joy,\nIn that resurrection morning.\n\nO brother, be faithful! for why should we prove\nUnworthy His coming to meet?\nAnd why should we lose the bright token of love,\nHe'll give to the trusting and sweet.\n\nO, be faithful, be faithful,\nThe great and the small must appear;\nAnd the faithful in Christ will be welcomed with joy,\nIn that resurrection morning."},
+  {n:614,t:"Shall We Gather at the River",c:"comfort",m:"8.7.8.7 with refrain",
+   l:"Shall we gather at the river,\nWhere bright angel feet have trod;\nWith its crystal tide forever\nFlowing by the throne of God?\n\nYes, we'll gather at the river,\nThe beautiful, the beautiful river;\nGather with the saints at the river\nThat flows by the throne of God.\n\nOn the margin of the river,\nWashing up its silver spray,\nWe shall walk and worship ever,\nAll the happy golden day.\n\nYes, we'll gather at the river,\nThe beautiful, the beautiful river;\nGather with the saints at the river\nThat flows by the throne of God.\n\nOn the bosom of the river,\nWhere the Savior-King we own,\nWe shall meet and sorrow never,\n'Neath the glory of the throne.\n\nYes, we'll gather at the river,\nThe beautiful, the beautiful river;\nGather with the saints at the river\nThat flows by the throne of God.\n\nEre we reach the shining river,\nLay we every burden down;\nGrace our spirits will deliver,\nAnd provide a robe and crown.\n\nYes, we'll gather at the river,\nThe beautiful, the beautiful river;\nGather with the saints at the river\nThat flows by the throne of God."},
+  {n:627,t:"There Is a Fountain",c:"faith",m:"CMD",
+   l:"There is a fountain filled with blood\nDrawn from Emmanuel's veins;\nAnd sinners plunged beneath that flood\nLose all their guilty stains.\nLose all their guilty stains,\nLose all their guilty stains;\nAnd sinners plunged beneath that flood\nLose all their guilty stains.\n\nThe dying thief rejoiced to see\nThat fountain in his day;\nAnd there have I, though vile as he,\nWashed all my sins away.\nWashed all my sins away,\nWashed all my sins away;\nAnd there have I, though vile as he,\nWashed all my sins away.\n\nDear dying Lamb, Thy precious blood\nShall never lose its pow'r\nTill all the ransomed church of God\nBe saved to sin no more.\nBe saved to sin no more,\nBe saved to sin no more;\nTill all the ransomed church of God\nBe saved to sin no more.\n\nE'er since, by faith, I saw the stream\nThy flowing wounds supply,\nRedeeming love has been my theme,\nAnd shall be till I die.\nAnd shall be till I die,\nAnd shall be till I die;\nRedeeming love has been my theme,\nAnd shall be till I die."},
+  {n:633,t:"When We All Get to Heaven",c:"advent",m:"Irregular with refrain",
+   l:"Sing the wondrous love of Jesus,\nSing His mercy and His grace;\nIn the mansions bright and blessèd\nHe'll prepare for us a place.\n\nWhen we all get to heaven,\nWhat a day of rejoicing that will be!\nWhen we all see Jesus,\nWe'll sing and shout the victory!\n\nWhile we walk the pilgrim pathway,\nClouds will overspread the sky;\nBut when trav'ling days are over,\nNot a shadow, not a sigh.\n\nWhen we all get to heaven,\nWhat a day of rejoicing that will be!\nWhen we all see Jesus,\nWe'll sing and shout the victory!\n\nLet us then be true and faithful,\nTrusting, serving every day;\nJust one glimpse of Him in glory\nWill the toils of life repay.\n\nWhen we all get to heaven,\nWhat a day of rejoicing that will be!\nWhen we all see Jesus,\nWe'll sing and shout the victory!\n\nOnward to the prize before us!\nSoon His beauty we'll behold;\nSoon the pearly gates will open;\nWe shall tread the streets of gold.\n\nWhen we all get to heaven,\nWhat a day of rejoicing that will be!\nWhen we all see Jesus,\nWe'll sing and shout the victory!"},
+  {n:649,t:"Abide with Me",c:"comfort",m:"10.10.10.10",
+   l:"Abide with me; fast falls the eventide;\nThe darkness deepens; Lord, with me abide!\nWhen other helpers fail and comforts flee,\nHelp of the helpless, O abide with me.\n\nSwift to its close ebbs out life's little day;\nEarth's joys grow dim, its glories pass away;\nChange and decay in all around I see;\nO Thou who changest not, abide with me.\n\nI need Thy presence every passing hour;\nWhat but Thy grace can foil the tempter's pow'r?\nWho like Thyself my guide and stay can be?\nThrough cloud and sunshine, Lord, abide with me.\n\nI fear no foe, with Thee at hand to bless;\nIlls have no weight, and tears no bitterness.\nWhere is death's sting? where, grave, thy victory?\nI triumph still, if Thou abide with me.\n\nHold Thou Thy cross before my closing eyes;\nShine through the gloom and point me to the skies.\nHeav'n's morning breaks, and earth's vain shadows flee;\nIn life, in death, O Lord, abide with me."},
+  {n:664,t:"Now the Day Is Over",c:"prayer",m:"6.5.6.5",
+   l:"Now the day is over,\nNight is drawing nigh,\nShadows of the evening\nSteal across the sky.\n\nNow the darkness gathers,\nStars begin to peep,\nBirds and beasts and flowers\nSoon will be asleep.\n\nJesus, give the weary\nCalm and sweet repose;\nWith Thy tend'rest blessing\nMay our eyelids close.\n\nGrant to little children\nVisions bright of Thee;\nGuard the sailors tossing\nOn the deep, dark sea.\n\nComfort every sufferer\nWatching late in pain;\nThose who plan some evil\nFrom their sin restrain.\n\nThrough the long night watches\nMay Thine angels spread\nTheir white wings above me,\nWatching round my bed.\n\nWhen the morning wakens,\nThen may I arise\nPure and fresh and sinless\nIn Thy holy eyes."},
+  {n:672,t:"Day Is Dying in the West",c:"prayer",m:"7.7.7.7 D with refrain",
+   l:"Day is dying in the west,\nHeav'n is touching earth with rest;\nWait and worship while the night\nSets her evening lamps alight\nThrough all the sky.\n\nHoly, holy, holy, Lord God of Hosts!\nHeav'n and earth are full of Thee!\nHeav'n and earth are praising Thee,\nO Lord most high!\n\nLord of life, beneath the dome\nOf the universe Thy home,\nGather us who seek Thy face\nTo the fold of Thy embrace,\nFor Thou art nigh.\n\nHoly, holy, holy, Lord God of Hosts!\nHeav'n and earth are full of Thee!\nHeav'n and earth are praising Thee,\nO Lord most high!"},
+  {n:700,t:"Praise God, from Whom All Blessings Flow",c:"praise",m:"LM",
+   l:"Praise God, from whom all blessings flow;\nPraise Him, all creatures here below;\nPraise Him above, ye heavenly host;\nPraise Father, Son, and Holy Ghost.\nAmen."},
+];
+
+function setHCat(cat, btn) {
+  _hymnCat = cat;
+  document.querySelectorAll('#page-hymnal .anb').forEach(function(b){ b.classList.remove('on'); });
+  if (btn) btn.classList.add('on');
+  renderHymnList();
+}
+
+function renderHymnList() {
+  var q   = (document.getElementById('hymn-q')?.value || '').toLowerCase().trim();
+  var el  = document.getElementById('hymn-list');
+  if (!el) return;
+
+  var list = HYMNS.filter(function(h) {
+    if (_hymnCat === 'fav') return _hymnFavs.includes(h.n);
+    if (_hymnCat !== 'all' && h.c !== _hymnCat) return false;
+    if (!q) return true;
+    return String(h.n).includes(q) || h.t.toLowerCase().includes(q) || h.l.toLowerCase().includes(q);
+  });
+
+  if (!list.length) {
+    el.innerHTML = '<div class="empty">No hymns found.</div>';
+    return;
+  }
+
+  el.innerHTML = list.map(function(h) {
+    var isFav = _hymnFavs.includes(h.n);
+    var firstLine = h.l.split('\n')[0];
+    return '<div class="church-item" onclick="openHymn(' + h.n + ')" style="flex-direction:column;align-items:flex-start;gap:3px;padding:13px 15px">'
+      + '<div style="display:flex;align-items:center;width:100%;gap:8px">'
+      + '<span style="font-size:11px;font-weight:700;color:var(--text3);min-width:28px">#' + h.n + '</span>'
+      + '<span style="font-size:14px;font-weight:700;color:var(--text);flex:1">' + h.t + '</span>'
+      + (isFav ? '<span style="color:#e05;font-size:15px">♥</span>' : '')
+      + '<span style="color:var(--text3);font-size:18px">›</span>'
+      + '</div>'
+      + '<div style="font-size:11.5px;color:var(--text3);padding-left:36px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%">' + firstLine + '</div>'
+      + '</div>';
+  }).join('');
+}
+
+function openHymn(n) {
+  _hymnId = n;
+  var h = HYMNS.find(function(x){ return x.n === n; });
+  if (!h) return;
+  document.getElementById('hymnal-list-view').style.display  = 'none';
+  document.getElementById('hymnal-detail-view').style.display = 'block';
+  document.getElementById('hymn-detail-num').textContent   = 'Hymn #' + h.n;
+  document.getElementById('hymn-detail-title').textContent = h.t;
+  document.getElementById('hymn-detail-meter').textContent = h.m ? 'Meter: ' + h.m : '';
+  document.getElementById('hymn-detail-lyrics').textContent = h.l;
+  var isFav = _hymnFavs.includes(h.n);
+  document.getElementById('hymn-fav-btn').textContent = isFav ? '♥' : '♡';
+  document.getElementById('hymn-fav-btn').style.color = isFav ? '#e05' : 'var(--text2)';
+  window.scrollTo(0, 0);
+}
+
+function hymnBack() {
+  if (document.getElementById('hymnal-detail-view').style.display === 'block') {
+    document.getElementById('hymnal-detail-view').style.display = 'none';
+    document.getElementById('hymnal-list-view').style.display   = 'block';
+  } else {
+    nav('home');
+  }
+}
+
+function toggleHymnFav() {
+  if (_hymnId === null) return;
+  var idx = _hymnFavs.indexOf(_hymnId);
+  if (idx >= 0) _hymnFavs.splice(idx, 1);
+  else _hymnFavs.push(_hymnId);
+  localStorage.setItem('sda-hymn-favs', JSON.stringify(_hymnFavs));
+  var isFav = _hymnFavs.includes(_hymnId);
+  document.getElementById('hymn-fav-btn').textContent = isFav ? '♥' : '♡';
+  document.getElementById('hymn-fav-btn').style.color = isFav ? '#e05' : 'var(--text2)';
+  toast(isFav ? '❤️ Added to favourites' : 'Removed from favourites');
+}
+
+function shareHymn() {
+  var h = HYMNS.find(function(x){ return x.n === _hymnId; });
+  if (!h) return;
+  var text = 'Hymn #' + h.n + ' — ' + h.t + '\n\n' + h.l.split('\n').slice(0,4).join('\n') + '\n\n— SDA Zambia Portal';
+  if (navigator.share) {
+    navigator.share({ title: h.t, text: text }).catch(function(){});
+  } else {
+    navigator.clipboard?.writeText(text).then(function(){ toast('📋 Copied to clipboard'); });
+  }
+}
+
+window.initPushSection=initPushSection;window.enablePushForAdmin=enablePushForAdmin;window.sendPushNotification=sendPushNotification;window.renderPushHistory=renderPushHistory;
+window.openHymn=openHymn;window.hymnBack=hymnBack;window.toggleHymnFav=toggleHymnFav;window.shareHymn=shareHymn;window.setHCat=setHCat;window.renderHymnList=renderHymnList;
 window.minTab=minTab;
 function toggleAcc(key){const btn=document.getElementById('acc-'+key);const body=document.getElementById('acc-body-'+key);if(!btn||!body)return;const opening=!body.classList.contains('open');btn.classList.toggle('open',opening);body.classList.toggle('open',opening);btn.setAttribute('aria-expanded',opening);try{var s=JSON.parse(localStorage.getItem('sda-acc-state')||'{}');s[key]=opening;localStorage.setItem('sda-acc-state',JSON.stringify(s));}catch(e){}}
 window.toggleAcc=toggleAcc;
