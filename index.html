@@ -11064,7 +11064,9 @@ window.campRegTileClick = function() {
 window.renderRegLock = function() {
   var el = document.getElementById('adm-reg-lock-card');
   if (!el) return;
-  el.innerHTML = '<div style="text-align:center;font-size:12px;color:var(--text3);padding:10px">⏳ Loading...</div>';
+  // Show cached state immediately so the toggle is always visible
+  _campRegRenderCard(_campRegIsOpen());
+  // Then confirm/update from cloud
   _campRegLoadCloud(function(open) { _campRegUpdateTile(open); _campRegRenderCard(open); });
 };
 
