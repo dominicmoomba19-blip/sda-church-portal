@@ -188,6 +188,19 @@ function _fbUpdate(col, id, data) {
     return window._FBDB.collection(_confPath(col)).doc(id).set(data, { merge: true });
   });
 }
+function _fbDelete(col, id) {
+  if (!window._FBDB || !id) return Promise.resolve(null);
+  return window._FBDB.collection(_confPath(col)).doc(id).delete().catch(function(){});
+}
+function _fbPurgeExpired(col, rows) {
+  // Silently delete any expired docs from Firestore in the background
+  var now = Date.now();
+  rows.forEach(function(r) {
+    var expired = r.expiresAt ? r.expiresAt < now
+      : r.postedAtMs && (now - r.postedAtMs) > (7 * 24 * 60 * 60 * 1000);
+    if (expired && r._fbId) _fbDelete(col, r._fbId);
+  });
+}
 
 // ── Global (top-level, non-conference-scoped) Firestore helpers ─
 // Used for collections that must be visible to ALL users regardless of
@@ -5493,10 +5506,12 @@ function renderMiss(){
   if (window._FBDB && !renderMiss._syncing) {
     renderMiss._syncing = true;
     _fbGetDocs('missions').then(function(rows) {
+        _fbPurgeExpired('missions', rows);
+        var live = rows.filter(function(m){ return !m.expiresAt || m.expiresAt > Date.now(); });
         var local = LS.get('x-miss', []);
-        var fbIds = new Set(rows.map(function(m){ return m.id || m._fbId; }));
-        local.forEach(function(m){ if (!fbIds.has(m.id)) rows.push(m); });
-        LS.set('x-miss', rows);
+        var fbIds = new Set(live.map(function(m){ return m.id || m._fbId; }));
+        local.forEach(function(m){ if (!fbIds.has(m.id)) live.push(m); });
+        LS.set('x-miss', live);
         renderMiss._syncing = false;
         renderMiss();
       }).catch(function(){ renderMiss._syncing = false; });
@@ -7753,6 +7768,7 @@ function renderAdmPL(){
   _render(LS.get(key,[]).filter(p=>!p.expiresAt||p.expiresAt>Date.now()));
   // Fetch from Firebase so prayers submitted on any device appear here
   _fbGetDocs('prayers',{churchId:churchId}).then(function(rows){
+    _fbPurgeExpired('prayers', rows);
     const localNow=LS.get(key,[]);
     const fbIds=new Set(rows.map(r=>r.id||r._fbId));
     localNow.forEach(r=>{if(!fbIds.has(r.id))rows.push(r);});
@@ -7781,6 +7797,7 @@ function renderAdmRL(){
   _render(LS.get(key,[]).filter(r=>!r.expiresAt||r.expiresAt>Date.now()));
   // Fetch from Firebase so requests submitted on any device appear here
   _fbGetDocs('requests',{churchId:churchId}).then(function(rows){
+    _fbPurgeExpired('requests', rows);
     const localNow=LS.get(key,[]);
     const fbIds=new Set(rows.map(r=>r.id||r._fbId));
     localNow.forEach(r=>{if(!fbIds.has(r.id))rows.push(r);});
@@ -10084,6 +10101,7 @@ function loadFirestorePrayerWall(filter) {
   renderPrayerWall(_filter && _filter !== 'all' ? local.filter(p => p.type === _filter) : local);
   // Fetch from Firebase for cross-device sync
   _fbGetDocs('prayerwall', { churchId: churchId }).then(function(fbRows) {
+    _fbPurgeExpired('prayerwall', fbRows);
     var localNow = LS.get(key, []);
     var fbIds = new Set(fbRows.map(function(r){ return r.id; }));
     localNow.forEach(function(r){
@@ -10159,6 +10177,7 @@ function loadFirestoreTestimonies() {
   renderTestimonies(LS.get(key, []).filter(t => !t.expiresAt || t.expiresAt > now));
   // Fetch from Firebase for cross-device sync
   _fbGetDocs('testimonies').then(function(allRows) {
+    _fbPurgeExpired('testimonies', allRows);
     var fbRows = allRows.filter(function(t){
       return t.churchId === churchId || (t.church && makeChurchId(t.church) === churchId);
     });
@@ -10423,6 +10442,8 @@ function submitCampRegistration() {
     var sucEl=document.getElementById('camp-reg-success');
     if(formEl) formEl.style.display='none';
     if(sucEl)  sucEl.style.display='block';
+    // Bust admin cache so new registration shows immediately
+    if (renderAdminCampRegs._cache) renderAdminCampRegs._cache = {};
     renderCampRegistrations();
   }).catch(function() {
     if(errEl){errEl.textContent='Submission failed. Check your connection and try again.';errEl.style.display='block';}
@@ -10537,9 +10558,49 @@ function renderAdminCampRegs() {
     } catch(e) {}
   }
   purgeLocalExpired(lsKey);
+
+  // Cache: skip Firestore if fetched within last 2 minutes for same type
+  var cacheKey = 'campRegsCache_' + colName;
+  if (!renderAdminCampRegs._cache) renderAdminCampRegs._cache = {};
+  var lastFetch = renderAdminCampRegs._cache[cacheKey] || 0;
+  if (Date.now() - lastFetch < 2 * 60 * 1000) {
+    try { draw(JSON.parse(localStorage.getItem(lsKey)||'[]')); } catch(e) { draw([]); }
+    return;
+  }
+
   if (window.FB) {
-    window.FB.getDocs(window.FB.collection(window.FB.db, colName)).then(function(snap){
-      var regs=[]; snap.forEach(function(d){regs.push(d.data());}); draw(regs);
+    var adminChurchId = (typeof currentAdmin !== 'undefined' && currentAdmin && !isSuperAdmin(currentAdmin))
+                        ? (currentAdmin.churchId || null) : null;
+    // Regular admin: only fetch own church. SuperAdmin: fetch all.
+    var col = window.FB.collection(window.FB.db, colName);
+    var fbQuery = adminChurchId
+      ? window.FB.query(col, window.FB.where('churchId','==', adminChurchId))
+      : col;
+    window.FB.getDocs(fbQuery).then(function(snap){
+      var regs=[];
+      var now = Date.now();
+      var toDelete = [];
+      snap.forEach(function(d){
+        var data = d.data();
+        // Check if expired — either by expiresAt field or by 19-day age
+        var expired = data.expiresAt
+          ? data.expiresAt < now
+          : data.ts && (now - new Date(data.ts).getTime()) > (19 * 24 * 60 * 60 * 1000);
+        if (expired) {
+          toDelete.push(d.ref); // mark for deletion
+        } else {
+          regs.push(data);
+        }
+      });
+      // Silently delete expired docs from Firestore in the background
+      if (toDelete.length && window.FB.deleteDoc) {
+        toDelete.forEach(function(ref) {
+          window.FB.deleteDoc(ref).catch(function(){});
+        });
+      }
+      try { localStorage.setItem(lsKey, JSON.stringify(regs)); } catch(e) {}
+      renderAdminCampRegs._cache[cacheKey] = Date.now();
+      draw(regs);
     }).catch(function(){
       try{draw(JSON.parse(localStorage.getItem(lsKey)||'[]'));}catch(e){draw([]);}
     });
