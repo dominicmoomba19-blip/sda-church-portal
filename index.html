@@ -5021,18 +5021,37 @@ function renderActsList(){
   const lblEl=document.getElementById('acts-church-lbl');
   if(!listEl)return;
 
-  if (window.FB && !renderActsList._syncing) {
+  // Only fetch from Firestore if cache is stale (5 min TTL) and not already syncing
+  const ACTS_TTL = 5 * 60 * 1000;
+  const cacheAge = Date.now() - (renderActsList._lastSync || 0);
+  if (window.FB && !renderActsList._syncing && cacheAge > ACTS_TTL) {
     renderActsList._syncing = true;
-    const { getDocs, collection, db } = window.FB;
+    const { getDocs, collection, query, where, limit, db } = window.FB;
     const timeout = new Promise((_, rej) => setTimeout(() => rej('timeout'), 8000));
-    Promise.race([getDocs(collection(db, 'activities')), timeout])
-      .then(snap => {
+    // Scope the query: fetch own church + district + general (all), capped at 30 docs each
+    const churchId = selectedChurchId || null;
+    const distId = selectedDist?.id || null;
+    const queries = [];
+    // Always fetch general/all-scope activities
+    queries.push(getDocs(query(collection(db,'activities'), where('scope','==','all'), limit(30))));
+    // Fetch church-specific if we know the church
+    if (churchId) queries.push(getDocs(query(collection(db,'activities'), where('churchId','==',churchId), limit(30))));
+    // Fetch district-specific if we know the district
+    if (distId) queries.push(getDocs(query(collection(db,'activities'), where('distKey','==',distId), limit(30))));
+    Promise.race([Promise.all(queries), timeout])
+      .then(snaps => {
+        const seen = new Set();
         const fbActs = [];
-        snap.forEach(d => { const data = d.data(); data._fbId = d.id; fbActs.push(data); });
+        snaps.forEach(snap => {
+          snap.forEach(d => {
+            if (!seen.has(d.id)) { seen.add(d.id); const data = d.data(); data._fbId = d.id; fbActs.push(data); }
+          });
+        });
         const local = LS.get('x-acts', []);
         const fbIds = new Set(fbActs.map(a => a.id));
         local.forEach(a => { if (!fbIds.has(a.id)) fbActs.push(a); });
         LS.set('x-acts', fbActs);
+        renderActsList._lastSync = Date.now();
         renderActsList._syncing = false;
         renderActsList();
       })
@@ -5209,6 +5228,7 @@ function addAct(){
   document.getElementById('act-prev').innerHTML='';actPhotoURL=null;
   toast('\u2705 Posted to '+scopeLabel);
   addLog('Activity: '+n+' \u2192 '+scopeLabel);
+  renderActsList._lastSync = 0; // bust cache so next render fetches fresh
   updStats();renderMyActs();renderActs();
 }
 function renderMyActs(){
@@ -5241,6 +5261,7 @@ function delAct(id){
   const extra=LS.get('x-acts',[]).filter(a=>a.id!==id);
   LS.set('x-acts',extra);
   toast('Activity removed');
+  renderActsList._lastSync = 0; // bust cache so next render fetches fresh
   renderMyActs();renderActs();updStats();
 }
 function shareAct(id){
