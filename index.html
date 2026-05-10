@@ -142,25 +142,16 @@
     window._authRegistering = false; // flag to pause onAuthStateChanged during registration
     // Keep session alive across page reloads
     window._FBAUTH.onAuthStateChanged(function(user){
-      if(window._authRegistering) return; // ignore during registration flow
-      if(user){
-        // User is signed in — verify they are an approved admin in Firestore
-        if(window.FB){
-          var email = user.email.toLowerCase();
-          var {getDocs,collection,query,where,db} = window.FB;
-          getDocs(query(collection(db,'subscription_requests'),where('u','==',email)))
-            .then(function(snap){
-              var profile=null;
-              snap.forEach(function(d){ var data=d.data(); if(data.role==='admin'){data._gsId=d.id;profile=data;} });
-              if(profile && !currentAdmin){
-                var all=LS.get('sda-admins',[]);
-                var idx=all.findIndex(function(a){return a.u===email;});
-                if(idx>=0)all[idx]=Object.assign(all[idx],profile);else all.push(profile);
-                LS.set('sda-admins',all);admins=all;
-                _completeLogin(profile);
-              }
-            }).catch(function(){});
-        }
+      // Only auto-login SuperAdmin via Firebase Auth
+      // Regular admins use username/password handled by doLogin()
+      if(user && user.email && user.email.toLowerCase()==='dominicmoomba19@gmail.com' && !currentAdmin){
+        var sa={u:'dominicmoomba19@gmail.com',n:'Super Administrator',
+          church:'SDA Zambia HQ',churchId:'sda-zambia-hq',
+          distName:'National',conf:'NZU',role:'superadmin',registeredAt:null};
+        var allA=LS.get('sda-admins',[]);
+        if(!allA.find(function(a){return a.u===sa.u;})){allA.unshift(sa);LS.set('sda-admins',allA);}
+        admins=LS.get('sda-admins',[]);
+        _completeLogin(sa);
       }
     });
     console.info('[SDA Portal] Firebase Firestore + Auth initialised.');
@@ -1826,11 +1817,8 @@ textarea.finp { resize:vertical; min-height:90px; }
         <button class="atab" id="atab-renew" onclick="swTab('renew')" style="color:var(--teal,#0d9488)">🔄 Renew</button>
       </div>
       <div id="af-l">
-        <div style="background:#b4530922;border:1px solid #b4530966;border-radius:10px;padding:10px 12px;margin-bottom:14px;font-size:12px;color:var(--text2,#aaa);line-height:1.6">
-          🔔 <strong>System Upgrade Notice:</strong> We have upgraded to a more secure login system. If you had an existing admin account, please <strong>re-register</strong> using the Subscribe tab. You will be re-approved shortly. We apologise for the inconvenience.
-        </div>
-        <label class="flbl">Email Address</label>
-        <input class="finp" id="au" type="email" placeholder="your@email.com" autocomplete="email">
+        <label class="flbl">Username</label>
+        <input class="finp" id="au" type="text" placeholder="Username" autocomplete="username">
         <label class="flbl">Password</label>
         <div style="background:#7c3aed18;border:1px solid #7c3aed55;border-radius:8px;padding:8px 10px;margin-bottom:8px;font-size:11.5px;color:var(--text2,#888);line-height:1.5">
           🔒 <strong>Security tip:</strong> Use a password that is <em>unique to this portal</em>. Do not use the same password as your email, social media, or any personal account.
@@ -1838,14 +1826,13 @@ textarea.finp { resize:vertical; min-height:90px; }
         <input class="finp" id="ap" type="password" placeholder="Password" autocomplete="current-password">
         <div class="errbox" id="login-err"></div>
         <button class="btn btn-em btnf" style="margin-top:14px" onclick="doLogin()" id="login-btn">🔐 Login</button>
-        <button type="button" onclick="doForgotPassword()" style="background:none;border:none;color:var(--teal,#0d9488);font-size:12px;cursor:pointer;margin-top:8px;width:100%;text-align:center;padding:4px">Forgot password?</button>
       </div>
       <div id="af-r" style="display:none">
         <div class="adinf">Create your admin account. You will be able to post activities, sermons, and streams for your specific church.</div>
         <label class="flbl">Full Name</label>
         <input class="finp" id="arn" type="text" placeholder="e.g. Pastor John Banda" autocomplete="name">
-        <label class="flbl">Email Address</label>
-        <input class="finp" id="aru" type="email" placeholder="your@email.com" autocomplete="email">
+        <label class="flbl">Username <span style="color:var(--text3);font-size:9px;text-transform:none;letter-spacing:0">(min 3 chars)</span></label>
+        <input class="finp" id="aru" type="text" placeholder="e.g. LusakaCentralAdmin" autocomplete="username">
         <label class="flbl">Password <span style="color:var(--text3);font-size:9px;text-transform:none;letter-spacing:0">(min 6 chars)</span></label>
         <div style="background:#7c3aed18;border:1px solid #7c3aed55;border-radius:8px;padding:8px 10px;margin-bottom:8px;font-size:11.5px;color:var(--text2,#888);line-height:1.5">
           🔒 <strong>Security tip:</strong> Create a password that is <em>unique to this portal</em>. Do not reuse your email, WhatsApp, or any personal account password.
@@ -1909,8 +1896,8 @@ textarea.finp { resize:vertical; min-height:90px; }
         </div>
         <label class="flbl">Your Full Name</label>
         <input class="finp" id="sub-name" type="text" placeholder="e.g. Pastor John Banda" autocomplete="name">
-        <label class="flbl">Email Address (for your admin login)</label>
-        <input class="finp" id="sub-user" type="email" placeholder="your@email.com" autocomplete="email">
+        <label class="flbl">Username (for your admin login)</label>
+        <input class="finp" id="sub-user" type="text" placeholder="Min 3 characters" autocomplete="username">
         <label class="flbl">Password</label>
         <input class="finp" id="sub-pw" type="password" placeholder="Min 6 characters" autocomplete="new-password">
         <label class="flbl">Confirm Password</label>
@@ -4387,85 +4374,82 @@ function pruneExpiredAdmins(){
 function doLogin(){
   if(isLoginLocked()) return;
   setErr('login-err','');
-  const email=(document.getElementById('au').value||'').trim().toLowerCase();
+  const u=(document.getElementById('au').value||'').trim();
   const p=document.getElementById('ap').value||'';
-  if(!email||!p){setErr('login-err','Please enter your email and password.');return}
-  if(!window._FBAUTH){setErr('login-err','⚠️ Could not connect to server. Please check your connection.');return}
+  if(!u||!p){setErr('login-err','Please enter your username and password.');return}
   const loginBtn=document.getElementById('login-btn');
   function resetBtn(){ if(loginBtn){loginBtn.disabled=false;loginBtn.textContent='🔐 Login';} }
   if(loginBtn){loginBtn.disabled=true;loginBtn.textContent='⏳ Signing in...';}
 
-  // SuperAdmin shortcut — build profile directly after Firebase Auth
-  function _handleSuperAdmin(){
-    const sa={u:'dominicmoomba19@gmail.com',n:'Super Administrator',
-      church:'SDA Zambia HQ',churchId:'sda-zambia-hq',
-      distName:'National',conf:'NZU',role:'superadmin',registeredAt:null};
-    const allA=LS.get('sda-admins',[]);
-    if(!allA.find(function(a){return a.u===email;})){allA.unshift(sa);LS.set('sda-admins',allA);}
-    admins=LS.get('sda-admins',[]);
-    resetBtn();
-    _completeLogin(sa);
+  // SuperAdmin only — uses Firebase Auth
+  if(u.toLowerCase()==='dominicmoomba19@gmail.com'){
+    if(!window._FBAUTH){ setErr('login-err','⚠️ Could not connect. Please check your internet.'); resetBtn(); return; }
+    var _saTimeout=setTimeout(function(){ resetBtn(); setErr('login-err','⚠️ Login timed out. Check your internet.'); },15000);
+    var _saDone=false;
+    window._FBAUTH.signInWithEmailAndPassword(u.toLowerCase(), p)
+      .then(function(){
+        if(_saDone)return; _saDone=true; clearTimeout(_saTimeout);
+        var sa={u:'dominicmoomba19@gmail.com',n:'Super Administrator',
+          church:'SDA Zambia HQ',churchId:'sda-zambia-hq',
+          distName:'National',conf:'NZU',role:'superadmin',registeredAt:null};
+        var allA=LS.get('sda-admins',[]);
+        if(!allA.find(function(a){return a.u===sa.u;})){allA.unshift(sa);LS.set('sda-admins',allA);}
+        admins=LS.get('sda-admins',[]); resetBtn(); _completeLogin(sa);
+      })
+      .catch(function(err){
+        if(_saDone)return; _saDone=true; clearTimeout(_saTimeout);
+        var msg='Incorrect email or password.';
+        if(err.code==='auth/too-many-requests') msg='⚠️ Too many failed attempts. Please wait a few minutes.';
+        else if(err.code==='auth/network-request-failed') msg='⚠️ No internet connection.';
+        setErr('login-err',msg); resetBtn();
+      });
+    return;
   }
 
-  // 15-second timeout — unblock button if Firebase hangs
-  var _loginTimeout = setTimeout(function(){
-    resetBtn();
-    setErr('login-err','⚠️ Login timed out. Please check your internet and try again.');
-  }, 15000);
-  var _loginDone = false;
-  function _loginFinish(fn){ if(_loginDone) return; _loginDone=true; clearTimeout(_loginTimeout); fn(); }
-
-  window._FBAUTH.signInWithEmailAndPassword(email, p)
-    .then(function(){
-      // SuperAdmin — no Firestore profile needed
-      if(email==='dominicmoomba19@gmail.com'){ _loginFinish(_handleSuperAdmin); return; }
-      // Regular admin — fetch profile from Firestore
-      var FB=window.FB;
-      if(!FB){ setErr('login-err','⚠️ Could not reach database. Please try again.'); resetBtn(); window._FBAUTH.signOut(); return; }
-      FB.getDocs(FB.query(FB.collection(FB.db,'subscription_requests'),FB.where('u','==',email)))
-        .then(function(snap){
-          var profile=null;
-          snap.forEach(function(d){ var data=d.data(); if(data.role==='admin'||data.role==='pending_admin'){data._gsId=d.id;profile=data;} });
-          if(!profile){
-            setErr('login-err','⚠️ Account not found. Please re-register if you had a previous account.');
-            window._FBAUTH.signOut(); resetBtn(); return;
-          }
-          if(profile.role==='pending_admin'){
-            setErr('login-err','⏳ Your account is pending approval. Please check back soon.');
-            window._FBAUTH.signOut(); resetBtn(); return;
-          }
-          if(adminExpired(profile)){
-            var renewUserEl=document.getElementById('renew-user');
-            if(renewUserEl)renewUserEl.value=email;
-            setErr('renew-err',''); swTab('renew');
-            toast('⚠️ Your account expired. Fill in your payment details below to renew.',5000);
-            window._FBAUTH.signOut(); resetBtn(); return;
-          }
+  // Regular admins — old username/password system
+  pruneExpiredAdmins();
+  admins=LS.get('sda-admins',[]);
+  var found=admins.find(function(a){return a.u===u&&a.p===p;});
+  if(found&&found.role==='admin'&&!adminExpired(found)){ resetBtn(); _completeLogin(found); return; }
+  if(found&&adminExpired(found)){
+    var renewEl=document.getElementById('renew-user');
+    if(renewEl)renewEl.value=u;
+    setErr('renew-err',''); swTab('renew');
+    toast('⚠️ Your account expired. Fill in your payment details below to renew.',5000);
+    resetBtn(); return;
+  }
+  // Check Firestore for cross-device approvals
+  if(window.FB){
+    var FB=window.FB;
+    FB.getDocs(FB.query(FB.collection(FB.db,'subscription_requests'),FB.where('u','==',u)))
+      .then(function(snap){
+        var gsRecord=null;
+        snap.forEach(function(d){ var data=d.data(); if(data.role==='admin'){data._gsId=d.id;gsRecord=data;} });
+        if(gsRecord&&gsRecord.p===p){
           var all=LS.get('sda-admins',[]);
-          var idx=all.findIndex(function(a){return a.u===email;});
-          if(idx>=0)all[idx]=Object.assign(all[idx],profile);else all.push(profile);
-          LS.set('sda-admins',all); admins=all;
-          resetBtn();
-          _completeLogin(profile);
-        })
-        .catch(function(){ setErr('login-err','⚠️ Could not reach database. Please check your connection.'); resetBtn(); window._FBAUTH.signOut(); });
-    })
-    .catch(function(err){
-      var msg='Incorrect email or password.';
-      if(err.code==='auth/too-many-requests') msg='⚠️ Too many failed attempts. Please wait a few minutes.';
-      else if(err.code==='auth/network-request-failed') msg='⚠️ No internet connection. Please check your network.';
-      // Client-side rate limit as extra layer
-      if(err.code==='auth/wrong-password'||err.code==='auth/invalid-credential'||err.code==='auth/user-not-found'){
-        _loginFails++;
-        if(_loginFails>=5){
-          _loginLock=Date.now()+30000;
-          msg='⚠️ Too many failed attempts. Try again in 30 seconds.';
+          var idx=all.findIndex(function(a){return a.u===u;});
+          if(idx>=0)all[idx]=Object.assign(all[idx],gsRecord);else all.push(gsRecord);
+          LS.set('sda-admins',all);admins=all;
+          resetBtn(); _completeLogin(gsRecord);
+        } else if(found&&found.role==='pending_admin'){
+          setErr('login-err','⏳ Your account is pending approval. Please check back soon.'); resetBtn();
+        } else {
+          _loginFails++; if(_loginFails>=5){_loginLock=Date.now()+30000;}
+          setErr('login-err','Incorrect username or password.'); resetBtn();
         }
-      }
-      setErr('login-err',msg);
-      resetBtn();
-    });
+      })
+      .catch(function(){
+        if(found&&found.role==='pending_admin') setErr('login-err','⏳ Your account is pending approval.');
+        else setErr('login-err','Incorrect username or password. (Could not reach server)');
+        resetBtn();
+      });
+  } else {
+    if(found&&found.role==='pending_admin') setErr('login-err','⏳ Your account is pending approval.');
+    else setErr('login-err','Incorrect username or password.');
+    resetBtn();
+  }
 }
+
 function doForgotPassword(){
   const email=(document.getElementById('au').value||'').trim().toLowerCase();
   if(!email){setErr('login-err','Please enter your email address first, then tap Forgot password.');return}
@@ -4499,85 +4483,64 @@ function _completeLogin(found){
 }
 function doRegister(){
   setErr('reg-err','');
-  const n=(document.getElementById('arn')?.value||'').trim();
-  const email=(document.getElementById('aru')?.value||'').trim().toLowerCase();
-  const p=document.getElementById('arp')?.value||'';
-  const c=document.getElementById('arc')?.value||'';
-  const conf=document.getElementById('reg-conf')?.value||'';
-  const distId=document.getElementById('reg-dist')?.value||'';
-  const manualInp=document.getElementById('reg-church-manual');
-  const manual=(manualInp&&manualInp.style.display!=='none'?manualInp.value.trim():'');
-  const selChurch=document.getElementById('reg-church')?.value||'';
-  const church=manual||selChurch;
+  var n=(document.getElementById('arn')?.value||'').trim();
+  var u=(document.getElementById('aru')?.value||'').trim();
+  var p=document.getElementById('arp')?.value||'';
+  var c=document.getElementById('arc')?.value||'';
+  var conf=document.getElementById('reg-conf')?.value||'';
+  var distId=document.getElementById('reg-dist')?.value||'';
+  var manualInp=document.getElementById('reg-church-manual');
+  var manual=(manualInp&&manualInp.style.display!=='none'?manualInp.value.trim():'');
+  var selChurch=document.getElementById('reg-church')?.value||'';
+  var church=manual||selChurch;
   if(!n){setErr('reg-err','Please enter your full name.');return}
-  if(!email||!email.includes('@')){setErr('reg-err','Please enter a valid email address.');return}
+  if(u.length<3){setErr('reg-err','Username must be at least 3 characters.');return}
   if(p.length<6){setErr('reg-err','Password must be at least 6 characters.');return}
   if(p!==c){setErr('reg-err','Passwords do not match.');return}
   if(!church){setErr('reg-err','Please select or enter your church.');return}
-  if(!window._FBAUTH){setErr('reg-err','⚠️ Could not connect to server. Please check your internet.');return}
   admins=LS.get('sda-admins',[]);
-  const _regChurchId=makeChurchId(church);
-  const _regChurchTaken=admins.find(a=>a.churchId===_regChurchId&&(a.role==='admin'||a.role==='pending_admin')&&!isSuperAdmin(a));
+  if(admins.find(function(a){return a.u.toLowerCase()===u.toLowerCase();})){setErr('reg-err','Username already taken.');return}
+  var _regChurchId=makeChurchId(church);
+  var _regChurchTaken=admins.find(function(a){return a.churchId===_regChurchId&&(a.role==='admin'||a.role==='pending_admin')&&!isSuperAdmin(a);});
   if(_regChurchTaken){setErr('reg-err','⚠️ An admin account already exists for '+church+'. Each church can only have one admin.');return}
-  const dist=distById(distId);
-  const registeredAt=Date.now();
-  const na={u:email,n,church,churchId:makeChurchId(church),distId,distName:dist?dist.name:'',conf,registeredAt,role:'pending_admin'};
-  const regBtn=document.getElementById('reg-btn');
-  if(regBtn){regBtn.disabled=true;regBtn.textContent='⏳ Creating account...';}
+  var dist=distById(distId);
+  var na={u:u,p:p,n:n,church:church,churchId:makeChurchId(church),distId:distId,distName:dist?dist.name:'',conf:conf,registeredAt:Date.now(),role:'pending_admin'};
+  var regBtn=document.getElementById('reg-btn');
+  if(regBtn){regBtn.disabled=true;regBtn.textContent='⏳ Submitting...';}
+  function resetRegBtn(){ if(regBtn){regBtn.disabled=false;regBtn.textContent='✅ Create Account';} }
 
-  // Create Firebase Auth account first, then save profile to Firestore
-  window._authRegistering = true;
-  window._FBAUTH.createUserWithEmailAndPassword(email, p)
-    .then(function(){
-      // Save pending profile to Firestore
-      if(window.FB){
-        const {addDoc,collection,query,where,getDocs,db}=window.FB;
-        // Check cross-device church uniqueness
-        return getDocs(query(collection(db,'subscription_requests'),where('churchId','==',na.churchId)))
-          .then(function(snap){
-            let taken=false;
-            snap.forEach(function(d){
-              const data=d.data();
-              if((data.role==='admin'||data.role==='pending_admin')&&data.u!==email) taken=true;
-            });
-            if(taken){
-              setErr('reg-err','⚠️ An admin account already exists for '+church+'. Each church can only have one admin.');
-              // Delete the Auth account we just created since we can't proceed
-              window._FBAUTH.currentUser&&window._FBAUTH.currentUser.delete().catch(function(){});
-              return;
-            }
-            return addDoc(collection(db,'subscription_requests'), Object.assign({},na,{ts:Date.now()}))
-              .then(function(){
-                admins.push(na);LS.set('sda-admins',admins);
-                selectedChurch=church;selectedChurchId=makeChurchId(church);selectedDist=dist;selectedConf=conf||null;
-                updateChurchUI();
-                swTab('l');
-                setErr('login-err','');
-                toast('✅ Account created! Awaiting approval before you can log in.',6000);
-                addLog('Registered (pending): '+n+' ('+church+')');
-                ['arn','aru','arp','arc'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
-                // Sign out until approved
-                window._FBAUTH.signOut().catch(function(){});
-              });
-          });
-      }
-    })
-    .catch(function(err){
-      var msg='Could not create account. Please try again.';
-      if(err.code==='auth/email-already-in-use') msg='⚠️ An account with this email already exists. Please login instead.';
-      else if(err.code==='auth/invalid-email') msg='⚠️ Please enter a valid email address.';
-      else if(err.code==='auth/weak-password') msg='⚠️ Password is too weak. Please use at least 6 characters.';
-      setErr('reg-err',msg);
-    })
-    .finally(function(){
-      window._authRegistering = false;
-      if(regBtn){regBtn.disabled=false;regBtn.textContent='✅ Create Account';}
-    });
+  function _doRegSave(){
+    admins.push(na); LS.set('sda-admins',admins);
+    selectedChurch=church; selectedChurchId=makeChurchId(church); selectedDist=dist; selectedConf=conf||null;
+    updateChurchUI();
+    if(window.FB){
+      var FB=window.FB;
+      FB.addDoc(FB.collection(FB.db,'subscription_requests'),Object.assign({},na,{ts:Date.now()})).catch(function(){});
+    }
+    swTab('l'); setErr('login-err','');
+    toast('✅ Account created! Awaiting approval before you can log in.',6000);
+    addLog('Registered (pending): '+n+' ('+church+')');
+    ['arn','aru','arp','arc'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
+    resetRegBtn();
+  }
+
+  if(window.FB){
+    var FB=window.FB;
+    FB.getDocs(FB.query(FB.collection(FB.db,'subscription_requests'),FB.where('churchId','==',na.churchId)))
+      .then(function(snap){
+        var taken=false;
+        snap.forEach(function(d){
+          var data=d.data();
+          if((data.role==='admin'||data.role==='pending_admin')&&data.u!==u) taken=true;
+        });
+        if(taken){ setErr('reg-err','⚠️ An admin account already exists for '+church+'.'); resetRegBtn(); }
+        else _doRegSave();
+      })
+      .catch(function(){ _doRegSave(); });
+  } else {
+    _doRegSave();
+  }
 }
-// ══════════════════════════════════════════════════════════════
-// SUBSCRIPTION SYSTEM — 500 Kwacha / 60 days / THABO1 approval
-// ══════════════════════════════════════════════════════════════
-
 function submitSubscription() {
   setErr('sub-err','');
   // Helper: show error and scroll to it
@@ -4597,14 +4560,13 @@ function submitSubscription() {
   const txn  = (document.getElementById('sub-txn')?.value    ||'').trim();
   const phone= (document.getElementById('sub-phone')?.value  ||'').trim();
   if(!n)         { subErr('⚠️ Please enter your full name.','sub-name');      return; }
-  if(!u||!u.includes('@')) { subErr('⚠️ Please enter a valid email address.','sub-user'); return; }
+  if(u.length<3) { subErr('⚠️ Username must be at least 3 characters.','sub-user'); return; }
   if(p.length<6) { subErr('⚠️ Password must be at least 6 characters.','sub-pw'); return; }
   if(p!==p2)     { subErr('⚠️ Passwords do not match.','sub-pw2');      return; }
   if(!conf)      { subErr('⚠️ Please select your conference.','sub-conf'); return; }
   if(!church)    { subErr('⚠️ Please select your church.','sub-church');   return; }
   if(!txn)       { subErr('⚠️ Please enter your transaction/reference number.','sub-txn'); return; }
   if(!phone)     { subErr('⚠️ Please enter the phone number used to pay.','sub-phone'); return; }
-  if(!window._FBAUTH){ subErr('⚠️ Could not connect to server. Please check your internet.'); return; }
   const allA = LS.get('sda-admins',[]);
   // One admin per church — block if an active or pending admin already exists for this church
   const churchId = makeChurchId(church);
@@ -4612,7 +4574,7 @@ function submitSubscription() {
   if(churchTaken){ subErr('⚠️ An admin account already exists for '+church+'. Each church can only have one admin. Contact your existing admin or THABO1 if there is an issue.','sub-church'); return; }
   const dist = distById(distId);
   const req = {
-    u, n, church, churchId: makeChurchId(church),
+    u, p, n, church, churchId: makeChurchId(church),
     distId, distName: dist?dist.name:'', conf,
     registeredAt: Date.now(),
     role: 'pending_admin',
@@ -4621,63 +4583,44 @@ function submitSubscription() {
     subAmount: 500
   };
   const subBtn = document.getElementById('sub-btn') || document.querySelector('#af-s .btn-em');
-  function resetSubBtn(){ window._authRegistering=false; if(subBtn){subBtn.disabled=false;subBtn.textContent='📨 Submit Payment Request';} }
+  function resetSubBtn(){ if(subBtn){subBtn.disabled=false;subBtn.textContent='📨 Submit Payment Request';} }
   if(subBtn){subBtn.disabled=true;subBtn.textContent='⏳ Submitting...';}
-  window._authRegistering = true;
 
-  // 15-second timeout safety net — if Firebase hangs, unblock the button
-  var _subTimeout = setTimeout(function(){
-    resetSubBtn();
-    subErr('⚠️ Request timed out. Please check your internet connection and try again.');
-  }, 15000);
-
-  var _subDone = false;
-  function _subFinish(fn){ if(_subDone) return; _subDone=true; clearTimeout(_subTimeout); fn(); }
-
-  window._FBAUTH.createUserWithEmailAndPassword(u, p)
-    .then(function(){
-      var FB = window.FB;
-      if(!FB){ _subFinish(function(){ subErr('⚠️ Could not reach database. Please try again.'); resetSubBtn(); window._FBAUTH.signOut(); }); return; }
-      return FB.getDocs(FB.query(FB.collection(FB.db,'subscription_requests'),FB.where('churchId','==',makeChurchId(church))))
-        .then(function(snap){
-          var fbChurchTaken=false;
-          snap.forEach(function(d){
-            var data=d.data();
-            if((data.role==='admin'||data.role==='pending_admin')&&data.u!==u) fbChurchTaken=true;
-          });
-          if(fbChurchTaken){
-            subErr('⚠️ An admin account already exists for '+church+'. Each church can only have one admin.','sub-church');
-            window._FBAUTH.currentUser&&window._FBAUTH.currentUser.delete().catch(function(){});
-            resetSubBtn(); return;
-          }
-          var _fbReq=Object.assign({},req,{ts:Date.now()});
-          return FB.addDoc(FB.collection(FB.db,'subscription_requests'),_fbReq)
-            .then(function(){
-              allA.push(req); LS.set('sda-admins',allA); admins=allA;
-              ['sub-name','sub-user','sub-pw','sub-pw2','sub-txn','sub-phone'].forEach(function(id){
-                var el=document.getElementById(id); if(el)el.value='';
-              });
-              var sc=document.getElementById('sub-conf'); if(sc)sc.value='';
-              var sd=document.getElementById('sub-dist'); if(sd){sd.innerHTML='<option value="">-- Select your district --</option>';sd.disabled=true;}
-              var sch=document.getElementById('sub-church'); if(sch){sch.innerHTML='<option value="">-- Select your church --</option>';sch.disabled=true;}
-              window._FBAUTH.signOut().catch(function(){});
-              resetSubBtn();
-              toast('📨 Request submitted! THABO1 will review and approve your subscription.',6500);
-              addLog('Sub request: '+n+' ('+church+') txn:'+txn);
-              swTab('l');
-            })
-            .catch(function(){ subErr('⚠️ Could not save to database. Please try again.'); resetSubBtn(); window._FBAUTH.signOut(); });
-        })
-        .catch(function(){ subErr('⚠️ Could not reach database. Please check your connection.'); resetSubBtn(); window._FBAUTH.signOut(); });
-    })
-    .catch(function(err){
-      var msg='Could not create account. Please try again.';
-      if(err.code==='auth/email-already-in-use') msg='⚠️ An account with this email already exists. Please login instead.';
-      else if(err.code==='auth/invalid-email') msg='⚠️ Please enter a valid email address.';
-      else if(err.code==='auth/weak-password') msg='⚠️ Password is too weak. Use at least 6 characters.';
-      else if(err.code==='auth/network-request-failed') msg='⚠️ No internet connection. Please check your network and try again.';
-      _subFinish(function(){ subErr(msg,'sub-user'); resetSubBtn(); });
+  function _doSubmitSub(){
+    allA.push(req); LS.set('sda-admins',allA); admins=allA;
+    var _fbReq=Object.assign({},req,{ts:Date.now()});
+    if(window.FB){
+      window.FB.addDoc(window.FB.collection(window.FB.db,'subscription_requests'),_fbReq)
+        .then(function(){ toast('☁️ Request sent to superadmin!',3000); })
+        .catch(function(err){ toast('⚠️ Cloud sync failed. Please resubmit.',5000); });
+    }
+    ['sub-name','sub-user','sub-pw','sub-pw2','sub-txn','sub-phone'].forEach(function(id){
+      var el=document.getElementById(id); if(el)el.value='';
     });
+    var sc=document.getElementById('sub-conf'); if(sc)sc.value='';
+    var sd=document.getElementById('sub-dist'); if(sd){sd.innerHTML='<option value="">-- Select your district --</option>';sd.disabled=true;}
+    var sch=document.getElementById('sub-church'); if(sch){sch.innerHTML='<option value="">-- Select your church --</option>';sch.disabled=true;}
+    toast('📨 Request submitted! THABO1 will review and approve your subscription.',6500);
+    addLog('Sub request: '+n+' ('+church+') txn:'+txn);
+    resetSubBtn(); swTab('l');
+  }
+
+  if(window.FB){
+    var FB=window.FB;
+    FB.getDocs(FB.query(FB.collection(FB.db,'subscription_requests'),FB.where('churchId','==',makeChurchId(church))))
+      .then(function(snap){
+        var taken=false;
+        snap.forEach(function(d){
+          var data=d.data();
+          if((data.role==='admin'||data.role==='pending_admin')&&data.u!==u) taken=true;
+        });
+        if(taken){ subErr('⚠️ An admin account already exists for '+church+'.','sub-church'); resetSubBtn(); }
+        else _doSubmitSub();
+      })
+      .catch(function(){ _doSubmitSub(); });
+  } else {
+    _doSubmitSub();
+  }
 }
 // Expose to global scope (function defined inside IIFE)
 window.submitSubscription = submitSubscription;
