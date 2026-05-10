@@ -4407,10 +4407,18 @@ function doLogin(){
     _completeLogin(sa);
   }
 
+  // 15-second timeout — unblock button if Firebase hangs
+  var _loginTimeout = setTimeout(function(){
+    resetBtn();
+    setErr('login-err','⚠️ Login timed out. Please check your internet and try again.');
+  }, 15000);
+  var _loginDone = false;
+  function _loginFinish(fn){ if(_loginDone) return; _loginDone=true; clearTimeout(_loginTimeout); fn(); }
+
   window._FBAUTH.signInWithEmailAndPassword(email, p)
     .then(function(){
       // SuperAdmin — no Firestore profile needed
-      if(email==='dominicmoomba19@gmail.com'){ _handleSuperAdmin(); return; }
+      if(email==='dominicmoomba19@gmail.com'){ _loginFinish(_handleSuperAdmin); return; }
       // Regular admin — fetch profile from Firestore
       var FB=window.FB;
       if(!FB){ setErr('login-err','⚠️ Could not reach database. Please try again.'); resetBtn(); window._FBAUTH.signOut(); return; }
@@ -4617,10 +4625,19 @@ function submitSubscription() {
   if(subBtn){subBtn.disabled=true;subBtn.textContent='⏳ Submitting...';}
   window._authRegistering = true;
 
+  // 15-second timeout safety net — if Firebase hangs, unblock the button
+  var _subTimeout = setTimeout(function(){
+    resetSubBtn();
+    subErr('⚠️ Request timed out. Please check your internet connection and try again.');
+  }, 15000);
+
+  var _subDone = false;
+  function _subFinish(fn){ if(_subDone) return; _subDone=true; clearTimeout(_subTimeout); fn(); }
+
   window._FBAUTH.createUserWithEmailAndPassword(u, p)
     .then(function(){
       var FB = window.FB;
-      if(!FB){ subErr('⚠️ Could not reach database. Please try again.'); resetSubBtn(); window._FBAUTH.signOut(); return; }
+      if(!FB){ _subFinish(function(){ subErr('⚠️ Could not reach database. Please try again.'); resetSubBtn(); window._FBAUTH.signOut(); }); return; }
       return FB.getDocs(FB.query(FB.collection(FB.db,'subscription_requests'),FB.where('churchId','==',makeChurchId(church))))
         .then(function(snap){
           var fbChurchTaken=false;
@@ -4658,8 +4675,8 @@ function submitSubscription() {
       if(err.code==='auth/email-already-in-use') msg='⚠️ An account with this email already exists. Please login instead.';
       else if(err.code==='auth/invalid-email') msg='⚠️ Please enter a valid email address.';
       else if(err.code==='auth/weak-password') msg='⚠️ Password is too weak. Use at least 6 characters.';
-      subErr(msg,'sub-user');
-      resetSubBtn();
+      else if(err.code==='auth/network-request-failed') msg='⚠️ No internet connection. Please check your network and try again.';
+      _subFinish(function(){ subErr(msg,'sub-user'); resetSubBtn(); });
     });
 }
 // Expose to global scope (function defined inside IIFE)
