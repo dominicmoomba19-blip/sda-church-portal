@@ -113,6 +113,7 @@
 <!-- Firebase SDK (compat) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
 <!-- Firebase + Firestore backend -->
 <script>
@@ -137,7 +138,30 @@
     var _fbApp = firebase.initializeApp(_fbCfg, 'sda-portal');
     window._FBDB = firebase.firestore(_fbApp);
     window._FBDB.enablePersistence({ synchronizeTabs: true }).catch(function(){});
-    console.info('[SDA Portal] Firebase Firestore initialised.');
+    window._FBAUTH = firebase.auth(_fbApp);
+    // Keep session alive across page reloads
+    window._FBAUTH.onAuthStateChanged(function(user){
+      if(user){
+        // User is signed in — verify they are an approved admin in Firestore
+        if(window.FB){
+          var email = user.email.toLowerCase();
+          var {getDocs,collection,query,where,db} = window.FB;
+          getDocs(query(collection(db,'subscription_requests'),where('u','==',email)))
+            .then(function(snap){
+              var profile=null;
+              snap.forEach(function(d){ var data=d.data(); if(data.role==='admin'){data._gsId=d.id;profile=data;} });
+              if(profile && !currentAdmin){
+                var all=LS.get('sda-admins',[]);
+                var idx=all.findIndex(function(a){return a.u===email;});
+                if(idx>=0)all[idx]=Object.assign(all[idx],profile);else all.push(profile);
+                LS.set('sda-admins',all);admins=all;
+                _completeLogin(profile);
+              }
+            }).catch(function(){});
+        }
+      }
+    });
+    console.info('[SDA Portal] Firebase Firestore + Auth initialised.');
   } catch(err) {
     console.warn('[SDA Portal] Firebase init error:', err);
     window._FBDB = null;
@@ -1800,20 +1824,30 @@ textarea.finp { resize:vertical; min-height:90px; }
         <button class="atab" id="atab-renew" onclick="swTab('renew')" style="color:var(--teal,#0d9488)">🔄 Renew</button>
       </div>
       <div id="af-l">
-        <label class="flbl">Username</label>
-        <input class="finp" id="au" type="text" placeholder="Username" autocomplete="username">
+        <div style="background:#b4530922;border:1px solid #b4530966;border-radius:10px;padding:10px 12px;margin-bottom:14px;font-size:12px;color:var(--text2,#aaa);line-height:1.6">
+          🔔 <strong>System Upgrade Notice:</strong> We have upgraded to a more secure login system. If you had an existing admin account, please <strong>re-register</strong> using the Subscribe tab. You will be re-approved shortly. We apologise for the inconvenience.
+        </div>
+        <label class="flbl">Email Address</label>
+        <input class="finp" id="au" type="email" placeholder="your@email.com" autocomplete="email">
         <label class="flbl">Password</label>
+        <div style="background:#7c3aed18;border:1px solid #7c3aed55;border-radius:8px;padding:8px 10px;margin-bottom:8px;font-size:11.5px;color:var(--text2,#888);line-height:1.5">
+          🔒 <strong>Security tip:</strong> Use a password that is <em>unique to this portal</em>. Do not use the same password as your email, social media, or any personal account.
+        </div>
         <input class="finp" id="ap" type="password" placeholder="Password" autocomplete="current-password">
         <div class="errbox" id="login-err"></div>
         <button class="btn btn-em btnf" style="margin-top:14px" onclick="doLogin()" id="login-btn">🔐 Login</button>
+        <button type="button" onclick="doForgotPassword()" style="background:none;border:none;color:var(--teal,#0d9488);font-size:12px;cursor:pointer;margin-top:8px;width:100%;text-align:center;padding:4px">Forgot password?</button>
       </div>
       <div id="af-r" style="display:none">
         <div class="adinf">Create your admin account. You will be able to post activities, sermons, and streams for your specific church.</div>
         <label class="flbl">Full Name</label>
         <input class="finp" id="arn" type="text" placeholder="e.g. Pastor John Banda" autocomplete="name">
-        <label class="flbl">Username <span style="color:var(--text3);font-size:9px;text-transform:none;letter-spacing:0">(min 3 chars)</span></label>
-        <input class="finp" id="aru" type="text" placeholder="Username" autocomplete="username">
+        <label class="flbl">Email Address</label>
+        <input class="finp" id="aru" type="email" placeholder="your@email.com" autocomplete="email">
         <label class="flbl">Password <span style="color:var(--text3);font-size:9px;text-transform:none;letter-spacing:0">(min 6 chars)</span></label>
+        <div style="background:#7c3aed18;border:1px solid #7c3aed55;border-radius:8px;padding:8px 10px;margin-bottom:8px;font-size:11.5px;color:var(--text2,#888);line-height:1.5">
+          🔒 <strong>Security tip:</strong> Create a password that is <em>unique to this portal</em>. Do not reuse your email, WhatsApp, or any personal account password.
+        </div>
         <input class="finp" id="arp" type="password" placeholder="Password" autocomplete="new-password">
         <label class="flbl">Confirm Password</label>
         <input class="finp" id="arc" type="password" placeholder="Repeat password" autocomplete="new-password">
@@ -1873,11 +1907,8 @@ textarea.finp { resize:vertical; min-height:90px; }
         </div>
         <label class="flbl">Your Full Name</label>
         <input class="finp" id="sub-name" type="text" placeholder="e.g. Pastor John Banda" autocomplete="name">
-        <label class="flbl">Username (for your admin login)</label>
-        <input class="finp" id="sub-user" type="text" placeholder="Min 3 characters" autocomplete="username">
-        <div style="background:rgba(218,168,64,.08);border:1px solid rgba(218,168,64,.25);border-radius:9px;padding:9px 12px;margin-bottom:4px;font-size:11px;color:var(--text2);line-height:1.6">
-          ⚠️ <strong style="color:var(--gold2)">Note:</strong> Do not use your personal name as a username. Use your <strong>church name</strong> (e.g. <em>KabulongaChurch</em> or <em>LusakaCentral</em>). This keeps your personal information private.
-        </div>
+        <label class="flbl">Email Address (for your admin login)</label>
+        <input class="finp" id="sub-user" type="email" placeholder="your@email.com" autocomplete="email">
         <label class="flbl">Password</label>
         <input class="finp" id="sub-pw" type="password" placeholder="Min 6 characters" autocomplete="new-password">
         <label class="flbl">Confirm Password</label>
@@ -4353,58 +4384,70 @@ function pruneExpiredAdmins(){
 }
 function doLogin(){
   setErr('login-err','');
-  pruneExpiredAdmins();
-  admins=LS.get('sda-admins',[]);
-  const u=(document.getElementById('au').value||'').trim();
+  const email=(document.getElementById('au').value||'').trim().toLowerCase();
   const p=document.getElementById('ap').value||'';
-  if(!u||!p){setErr('login-err','Please enter both username and password.');return}
-  const found=admins.find(a=>a.u===u&&a.p===p);
-  // Fully approved locally — log in immediately
-  if(found && found.role==='admin' && !adminExpired(found)){ _completeLogin(found); return; }
-  if(found && adminExpired(found)){
-    // Auto-switch to Renew tab with username pre-filled
-    const renewUserEl=document.getElementById('renew-user');
-    if(renewUserEl){ renewUserEl.value=u; }
-    setErr('renew-err','');
-    swTab('renew');
-    toast('⚠️ Your account expired. Fill in your payment details below to renew.',5000);
-    return;
-  }
-  // Not locally approved — check Firestore (covers approvals done on other devices)
-  _checkGSApproval(u, p, found||null);
+  if(!email||!p){setErr('login-err','Please enter your email and password.');return}
+  if(!window._FBAUTH){setErr('login-err','⚠️ Could not connect to server. Please check your connection.');return}
+  const loginBtn=document.getElementById('login-btn');
+  if(loginBtn){loginBtn.disabled=true;loginBtn.textContent='⏳ Signing in...';}
+  window._FBAUTH.signInWithEmailAndPassword(email, p)
+    .then(function(cred){
+      // Fetch admin profile from Firestore using their email as the key
+      const {getDocs,collection,query,where,db}=window.FB;
+      return getDocs(query(collection(db,'subscription_requests'),where('u','==',email)))
+        .then(function(snap){
+          let profile=null;
+          snap.forEach(function(d){ const data=d.data(); if(data.role==='admin'||data.role==='pending_admin'){data._gsId=d.id;profile=data;} });
+          if(!profile){
+            // SuperAdmin fallback
+            if(email==='dominicmoomba19@gmail.com'){
+              const sa=LS.get('sda-admins',[]).find(isSuperAdmin);
+              if(sa){_completeLogin(sa);return;}
+            }
+            setErr('login-err','⚠️ Account not found. Please re-register if you had a previous account.');
+            window._FBAUTH.signOut();
+            return;
+          }
+          if(profile.role==='pending_admin'){
+            setErr('login-err','⏳ Your account is pending approval. Please check back soon.');
+            window._FBAUTH.signOut();
+            return;
+          }
+          if(adminExpired(profile)){
+            const renewUserEl=document.getElementById('renew-user');
+            if(renewUserEl)renewUserEl.value=email;
+            setErr('renew-err','');swTab('renew');
+            toast('⚠️ Your account expired. Fill in your payment details below to renew.',5000);
+            window._FBAUTH.signOut();
+            return;
+          }
+          // Sync profile to localStorage
+          const all=LS.get('sda-admins',[]);
+          const idx=all.findIndex(function(a){return a.u===email;});
+          if(idx>=0)all[idx]=Object.assign(all[idx],profile);else all.push(profile);
+          LS.set('sda-admins',all);admins=all;
+          _completeLogin(profile);
+        });
+    })
+    .catch(function(err){
+      var msg='Incorrect email or password.';
+      if(err.code==='auth/user-not-found'||err.code==='auth/wrong-password'||err.code==='auth/invalid-credential') msg='Incorrect email or password.';
+      else if(err.code==='auth/too-many-requests') msg='⚠️ Too many failed attempts. Please wait a few minutes and try again.';
+      else if(err.code==='auth/network-request-failed') msg='⚠️ No internet connection. Please check your network.';
+      setErr('login-err',msg);
+    })
+    .finally(function(){ if(loginBtn){loginBtn.disabled=false;loginBtn.textContent='🔐 Login';} });
 }
-function _checkGSApproval(u, p, localFound){
-  if(!window.FB){
-    if(localFound&&localFound.role==='pending_admin') setErr('login-err','⏳ Your subscription request is pending approval. Please check back soon.');
-    else setErr('login-err','Incorrect username or password.');
-    return;
-  }
-  const loginBtn=document.querySelector('#af-l .btn-em');
-  if(loginBtn){loginBtn.disabled=true;loginBtn.textContent='⏳ Verifying...';}
-  const {getDocs,collection,query,where,db}=window.FB;
-  getDocs(query(collection(db,'subscription_requests'),where('u','==',u)))
-    .then(function(snap){
-      let gsRecord=null;
-      snap.forEach(function(d){ const data=d.data(); if(data.role==='admin'){data._gsId=d.id;gsRecord=data;} });
-      if(gsRecord&&gsRecord.p===p){
-        const all=LS.get('sda-admins',[]);
-        const idx=all.findIndex(a=>a.u===u);
-        if(idx>=0) all[idx]=Object.assign(all[idx],gsRecord); else all.push(gsRecord);
-        LS.set('sda-admins',all); admins=all;
-        _completeLogin(gsRecord);
-      } else if(gsRecord&&gsRecord.p!==p){
-        setErr('login-err','Incorrect username or password.');
-      } else if(localFound&&localFound.role==='pending_admin'){
-        setErr('login-err','⏳ Your subscription request is pending approval. Please check back soon.');
-      } else {
-        setErr('login-err','Incorrect username or password.');
-      }
-    })
-    .catch(function(){
-      if(localFound&&localFound.role==='pending_admin') setErr('login-err','⏳ Your request is pending approval. (Could not reach server — try again.)');
-      else setErr('login-err','Incorrect username or password. (Could not reach server — try again.)');
-    })
-    .then(function(){ if(loginBtn){loginBtn.disabled=false;loginBtn.textContent='Login';} });
+function doForgotPassword(){
+  const email=(document.getElementById('au').value||'').trim().toLowerCase();
+  if(!email){setErr('login-err','Please enter your email address first, then tap Forgot password.');return}
+  if(!window._FBAUTH){setErr('login-err','⚠️ Could not connect. Please check your internet.');return}
+  window._FBAUTH.sendPasswordResetEmail(email)
+    .then(function(){ toast('📧 Password reset email sent to '+email+'. Check your inbox.',5000); setErr('login-err',''); })
+    .catch(function(err){
+      if(err.code==='auth/user-not-found') setErr('login-err','No account found with that email.');
+      else setErr('login-err','Could not send reset email. Please check your connection.');
+    });
 }
 function _completeLogin(found){
   if(!found.churchId&&found.church){
@@ -4429,7 +4472,7 @@ function _completeLogin(found){
 function doRegister(){
   setErr('reg-err','');
   const n=(document.getElementById('arn')?.value||'').trim();
-  const u=(document.getElementById('aru')?.value||'').trim();
+  const email=(document.getElementById('aru')?.value||'').trim().toLowerCase();
   const p=document.getElementById('arp')?.value||'';
   const c=document.getElementById('arc')?.value||'';
   const conf=document.getElementById('reg-conf')?.value||'';
@@ -4439,56 +4482,65 @@ function doRegister(){
   const selChurch=document.getElementById('reg-church')?.value||'';
   const church=manual||selChurch;
   if(!n){setErr('reg-err','Please enter your full name.');return}
-  if(u.length<3){setErr('reg-err','Username must be at least 3 characters.');return}
+  if(!email||!email.includes('@')){setErr('reg-err','Please enter a valid email address.');return}
   if(p.length<6){setErr('reg-err','Password must be at least 6 characters.');return}
   if(p!==c){setErr('reg-err','Passwords do not match.');return}
   if(!church){setErr('reg-err','Please select or enter your church.');return}
+  if(!window._FBAUTH){setErr('reg-err','⚠️ Could not connect to server. Please check your internet.');return}
   admins=LS.get('sda-admins',[]);
-  if(admins.find(a=>a.u.toLowerCase()===u.toLowerCase())){setErr('reg-err','Username already taken.');return}
   const _regChurchId=makeChurchId(church);
   const _regChurchTaken=admins.find(a=>a.churchId===_regChurchId&&(a.role==='admin'||a.role==='pending_admin')&&!isSuperAdmin(a));
   if(_regChurchTaken){setErr('reg-err','⚠️ An admin account already exists for '+church+'. Each church can only have one admin.');return}
   const dist=distById(distId);
   const registeredAt=Date.now();
-  const na={u,p,n,church,churchId:makeChurchId(church),distId,distName:dist?dist.name:'',conf,registeredAt,role:'pending_admin'};
+  const na={u:email,n,church,churchId:makeChurchId(church),distId,distName:dist?dist.name:'',conf,registeredAt,role:'pending_admin'};
+  const regBtn=document.getElementById('reg-btn');
+  if(regBtn){regBtn.disabled=true;regBtn.textContent='⏳ Creating account...';}
 
-  function _doRegSave(){
-    admins.push(na);LS.set('sda-admins',admins);
-    selectedChurch=church;selectedChurchId=makeChurchId(church);selectedDist=dist;selectedConf=conf||null;
-    updateChurchUI();
-    document.getElementById('af-r').style.display='none';
-    document.getElementById('af-l').style.display='block';
-    document.getElementById('atab-l').classList.add('on');
-    const rTab=document.getElementById('atab-r');if(rTab)rTab.classList.remove('on');
-    setErr('login-err','');
-    toast('✅ Account created! Awaiting approval by THABO1 before you can log in.',6000);
-    addLog('Registered (pending): '+n+' ('+church+')');
-    ['arn','aru','arp','arc'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
-  }
-
-  // Cross-device Firestore church uniqueness check
-  if(window.FB){
-    const regBtn=document.getElementById('reg-btn');
-    if(regBtn){regBtn.disabled=true;regBtn.textContent='⏳ Checking...';}
-    const {getDocs,collection,db}=window.FB;
-    getDocs(collection(db,'subscription_requests'))
-      .then(function(snap){
-        let fbChurchTaken=false;
-        snap.forEach(function(d){
-          const data=d.data();
-          if(data.churchId===na.churchId&&(data.role==='admin'||data.role==='pending_admin')&&data.u!==u) fbChurchTaken=true;
-        });
-        if(fbChurchTaken){
-          setErr('reg-err','⚠️ An admin account already exists for '+church+'. Each church can only have one admin.');
-        } else {
-          _doRegSave();
-        }
-      })
-      .catch(function(){ setErr('reg-err','⚠️ Could not verify church availability. Please check your connection and try again.'); })
-      .then(function(){ if(regBtn){regBtn.disabled=false;regBtn.textContent='✅ Create Account';} });
-  } else {
-    _doRegSave();
-  }
+  // Create Firebase Auth account first, then save profile to Firestore
+  window._FBAUTH.createUserWithEmailAndPassword(email, p)
+    .then(function(){
+      // Save pending profile to Firestore
+      if(window.FB){
+        const {addDoc,collection,query,where,getDocs,db}=window.FB;
+        // Check cross-device church uniqueness
+        return getDocs(query(collection(db,'subscription_requests'),where('churchId','==',na.churchId)))
+          .then(function(snap){
+            let taken=false;
+            snap.forEach(function(d){
+              const data=d.data();
+              if((data.role==='admin'||data.role==='pending_admin')&&data.u!==email) taken=true;
+            });
+            if(taken){
+              setErr('reg-err','⚠️ An admin account already exists for '+church+'. Each church can only have one admin.');
+              // Delete the Auth account we just created since we can't proceed
+              window._FBAUTH.currentUser&&window._FBAUTH.currentUser.delete().catch(function(){});
+              return;
+            }
+            return addDoc(collection(db,'subscription_requests'), Object.assign({},na,{ts:Date.now()}))
+              .then(function(){
+                admins.push(na);LS.set('sda-admins',admins);
+                selectedChurch=church;selectedChurchId=makeChurchId(church);selectedDist=dist;selectedConf=conf||null;
+                updateChurchUI();
+                swTab('l');
+                setErr('login-err','');
+                toast('✅ Account created! Awaiting approval before you can log in.',6000);
+                addLog('Registered (pending): '+n+' ('+church+')');
+                ['arn','aru','arp','arc'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
+                // Sign out until approved
+                window._FBAUTH.signOut().catch(function(){});
+              });
+          });
+      }
+    })
+    .catch(function(err){
+      var msg='Could not create account. Please try again.';
+      if(err.code==='auth/email-already-in-use') msg='⚠️ An account with this email already exists. Please login instead.';
+      else if(err.code==='auth/invalid-email') msg='⚠️ Please enter a valid email address.';
+      else if(err.code==='auth/weak-password') msg='⚠️ Password is too weak. Please use at least 6 characters.';
+      setErr('reg-err',msg);
+    })
+    .finally(function(){ if(regBtn){regBtn.disabled=false;regBtn.textContent='✅ Create Account';} });
 }
 // ══════════════════════════════════════════════════════════════
 // SUBSCRIPTION SYSTEM — 500 Kwacha / 60 days / THABO1 approval
@@ -4513,22 +4565,22 @@ function submitSubscription() {
   const txn  = (document.getElementById('sub-txn')?.value    ||'').trim();
   const phone= (document.getElementById('sub-phone')?.value  ||'').trim();
   if(!n)         { subErr('⚠️ Please enter your full name.','sub-name');      return; }
-  if(u.length<3) { subErr('⚠️ Username must be at least 3 characters.','sub-user'); return; }
+  if(!u||!u.includes('@')) { subErr('⚠️ Please enter a valid email address.','sub-user'); return; }
   if(p.length<6) { subErr('⚠️ Password must be at least 6 characters.','sub-pw'); return; }
   if(p!==p2)     { subErr('⚠️ Passwords do not match.','sub-pw2');      return; }
   if(!conf)      { subErr('⚠️ Please select your conference.','sub-conf'); return; }
   if(!church)    { subErr('⚠️ Please select your church.','sub-church');   return; }
   if(!txn)       { subErr('⚠️ Please enter your transaction/reference number.','sub-txn'); return; }
   if(!phone)     { subErr('⚠️ Please enter the phone number used to pay.','sub-phone'); return; }
+  if(!window._FBAUTH){ subErr('⚠️ Could not connect to server. Please check your internet.'); return; }
   const allA = LS.get('sda-admins',[]);
-  if(allA.find(a=>a.u.toLowerCase()===u.toLowerCase())){ subErr('⚠️ Username already taken. Please choose a different username.','sub-user'); return; }
   // One admin per church — block if an active or pending admin already exists for this church
   const churchId = makeChurchId(church);
   const churchTaken = allA.find(a=> a.churchId===churchId && (a.role==='admin'||a.role==='pending_admin') && !isSuperAdmin(a));
   if(churchTaken){ subErr('⚠️ An admin account already exists for '+church+'. Each church can only have one admin. Contact your existing admin or THABO1 if there is an issue.','sub-church'); return; }
   const dist = distById(distId);
   const req = {
-    u, p, n, church, churchId: makeChurchId(church),
+    u, n, church, churchId: makeChurchId(church),
     distId, distName: dist?dist.name:'', conf,
     registeredAt: Date.now(),
     role: 'pending_admin',
@@ -4536,67 +4588,55 @@ function submitSubscription() {
     subSubmittedAt: Date.now(),
     subAmount: 500
   };
-  // Inner function that actually saves once all checks pass
-  function _doSubmitSub() {
-    allA.push(req);
-    LS.set('sda-admins', allA);
-    admins = allA;
-    // Save to Firestore so superadmin sees it across ALL devices
-    var _fbReq = Object.assign({}, req);
-    _fbReq.ts = Date.now();
-    function _saveSubToFirebase(attempt) {
-      attempt = attempt || 1;
-      if (!window.FB) {
-        if (attempt <= 5) setTimeout(function() { _saveSubToFirebase(attempt + 1); }, 2000 * attempt);
-        return;
+  const subBtn = document.getElementById('sub-btn') || document.querySelector('#af-s .btn-em');
+  if(subBtn){subBtn.disabled=true;subBtn.textContent='⏳ Submitting...';}
+
+  // Step 1: Create Firebase Auth account
+  window._FBAUTH.createUserWithEmailAndPassword(u, p)
+    .then(function(){
+      // Step 2: Cross-device church check, then save to Firestore
+      if(window.FB){
+        const {getDocs, addDoc, collection, query, where, db} = window.FB;
+        return getDocs(query(collection(db,'subscription_requests'),where('churchId','==',makeChurchId(church))))
+          .then(function(snap){
+            let fbChurchTaken=false;
+            snap.forEach(function(d){
+              const data=d.data();
+              if((data.role==='admin'||data.role==='pending_admin')&&data.u!==u) fbChurchTaken=true;
+            });
+            if(fbChurchTaken){
+              subErr('⚠️ An admin account already exists for '+church+'. Each church can only have one admin.','sub-church');
+              window._FBAUTH.currentUser&&window._FBAUTH.currentUser.delete().catch(function(){});
+              return;
+            }
+            var _fbReq = Object.assign({},req,{ts:Date.now()});
+            return addDoc(collection(db,'subscription_requests'),_fbReq)
+              .then(function(docRef){
+                console.log('SDA: sub saved to Firebase',docRef.id);
+                allA.push(req);LS.set('sda-admins',allA);admins=allA;
+                ['sub-name','sub-user','sub-pw','sub-pw2','sub-txn','sub-phone'].forEach(function(id){
+                  var el=document.getElementById(id);if(el)el.value='';
+                });
+                var sc=document.getElementById('sub-conf');if(sc)sc.value='';
+                var sd=document.getElementById('sub-dist');if(sd){sd.innerHTML='<option value="">-- Select your district --</option>';sd.disabled=true;}
+                var sch=document.getElementById('sub-church');if(sch){sch.innerHTML='<option value="">-- Select your church --</option>';sch.disabled=true;}
+                toast('📨 Request submitted! THABO1 will review and approve your subscription.',6500);
+                addLog('Sub request: '+n+' ('+church+') txn:'+txn);
+                // Sign out until approved
+                window._FBAUTH.signOut().catch(function(){});
+                swTab('l');
+              });
+          });
       }
-      var addDoc = window.FB.addDoc;
-      var collection = window.FB.collection;
-      var db = window.FB.db;
-      addDoc(collection(db, 'subscription_requests'), _fbReq)
-        .then(function(docRef) {
-          console.log('SDA: sub saved to Firebase', docRef.id);
-          if (attempt === 1) toast('☁️ Request sent to superadmin!', 3000);
-        })
-        .catch(function(err) {
-          console.warn('SDA: Firebase sub save failed (attempt ' + attempt + '):', err);
-          if (attempt <= 3) setTimeout(function() { _saveSubToFirebase(attempt + 1); }, 3000 * attempt);
-          else toast('⚠️ Cloud sync failed: ' + (err.message || err) + '. Please resubmit.', 6000);
-        });
-    }
-    _saveSubToFirebase(1);
-    // Clear form
-    ['sub-name','sub-user','sub-pw','sub-pw2','sub-txn','sub-phone'].forEach(id=>{
-      const el=document.getElementById(id); if(el)el.value='';
-    });
-    const sc=document.getElementById('sub-conf'); if(sc)sc.value='';
-    const sd=document.getElementById('sub-dist'); if(sd){sd.innerHTML='<option value="">-- Select your district --</option>';sd.disabled=true;}
-    const sch=document.getElementById('sub-church'); if(sch){sch.innerHTML='<option value="">-- Select your church --</option>';sch.disabled=true;}
-    toast('📨 Request submitted! THABO1 will review and approve your subscription.',6500);
-    addLog('Sub request: '+n+' ('+church+') txn:'+txn);
-    swTab('l');
-  }
-  // Cross-device church check via Firestore before saving (falls back immediately if no FB)
-  if(window.FB){
-    const {getDocs, collection, query, where, db} = window.FB;
-    const _cid = makeChurchId(church);
-    getDocs(collection(db,'subscription_requests'))
-      .then(function(snap){
-        let fbChurchTaken = false;
-        snap.forEach(function(d){
-          const data=d.data();
-          if(data.churchId===_cid && (data.role==='admin'||data.role==='pending_admin') && data.u!==u) fbChurchTaken=true;
-        });
-        if(fbChurchTaken){
-          subErr('⚠️ An admin account already exists for '+church+' on another device. Each church can only have one admin.','sub-church');
-        } else {
-          _doSubmitSub();
-        }
-      })
-      .catch(function(){ subErr('⚠️ Could not verify church availability. Please check your connection and try again.','sub-church'); }); // network fail — block
-  } else {
-    _doSubmitSub();
-  }
+    })
+    .catch(function(err){
+      var msg='Could not create account. Please try again.';
+      if(err.code==='auth/email-already-in-use') msg='⚠️ An account with this email already exists. Please login instead.';
+      else if(err.code==='auth/invalid-email') msg='⚠️ Please enter a valid email address.';
+      else if(err.code==='auth/weak-password') msg='⚠️ Password is too weak. Use at least 6 characters.';
+      subErr(msg,'sub-user');
+    })
+    .finally(function(){ if(subBtn){subBtn.disabled=false;subBtn.textContent='💳 Submit & Pay';} });
 }
 // Expose to global scope (function defined inside IIFE)
 window.submitSubscription = submitSubscription;
@@ -4947,6 +4987,7 @@ window.renderSubBadge = renderSubBadge;
 
 function doLogout(){
   currentAdmin=null;
+  if(window._FBAUTH) window._FBAUTH.signOut().catch(function(){});
   try{ localStorage.removeItem('sda-admin-session'); }catch(_){}
   document.getElementById('adash').style.display='none';
   document.getElementById('alogwrap').style.display='block';
@@ -7830,7 +7871,7 @@ function renderLog(){
 function isSuperAdmin(a) {
   a = a || currentAdmin;
   if (!a) return false;
-  return a.role === 'superadmin' || a.u === 'SEVENTHDAYADVENTIST';
+  return a.role === 'superadmin' || a.u === 'SEVENTHDAYADVENTIST' || a.u === 'dominicmoomba19@gmail.com';
 }
 function isApprovedAdmin(a) {
   a = a || currentAdmin;
