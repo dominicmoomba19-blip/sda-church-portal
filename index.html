@@ -4399,10 +4399,16 @@ function doLogin(){
           let profile=null;
           snap.forEach(function(d){ const data=d.data(); if(data.role==='admin'||data.role==='pending_admin'){data._gsId=d.id;profile=data;} });
           if(!profile){
-            // SuperAdmin fallback
+            // If superadmin logs in, build their profile directly
             if(email==='dominicmoomba19@gmail.com'){
-              const sa=LS.get('sda-admins',[]).find(isSuperAdmin);
-              if(sa){_completeLogin(sa);return;}
+              const sa={u:'dominicmoomba19@gmail.com',n:'Super Administrator',
+                church:'SDA Zambia HQ',churchId:'sda-zambia-hq',
+                distName:'National',conf:'NZU',role:'superadmin',registeredAt:null};
+              const allA=LS.get('sda-admins',[]);
+              if(!allA.find(function(a){return a.u===email;})){allA.unshift(sa);LS.set('sda-admins',allA);}
+              admins=LS.get('sda-admins',[]);
+              _completeLogin(sa);
+              return;
             }
             setErr('login-err','⚠️ Account not found. Please re-register if you had a previous account.');
             window._FBAUTH.signOut();
@@ -9171,16 +9177,11 @@ function memLogout() {
 }
 
 // ─── Admin session restore (called on DOMContentLoaded) ────────────────────
+// Session is now managed entirely by Firebase Auth (onAuthStateChanged).
+// localStorage session is no longer trusted — clear it to force Firebase login.
 function restoreAdminSession() {
-  try {
-    const saved = JSON.parse(localStorage.getItem('sda-admin-session') || 'null');
-    if (!saved || !saved.u) return;
-    const allAdmins = LS.get('sda-admins', []);
-    const a = allAdmins.find(x => x.u === saved.u);
-    const expired = window._adminExpired ? window._adminExpired(a) : false;
-    if (a && !expired) openDash(a);
-    else localStorage.removeItem('sda-admin-session');
-  } catch(_) {}
+  try { localStorage.removeItem('sda-admin-session'); } catch(_) {}
+  // Firebase Auth onAuthStateChanged will handle session restoration automatically
 }
 
 // ─── Sync member's church into the global app church context ───────────
@@ -9697,26 +9698,14 @@ function openDash(a) {
   renderMemberApprovalBadge();
 }
 
-/* ── Super-admin login extension ─────────────────────────────────── */
+/* ── Super-admin login extension (legacy removed — now uses Firebase Auth) ── */
 const _origDoLogin = window.doLogin;
 window.doLogin = function() {
   const u = (document.getElementById('au')?.value || '').trim();
   const p =  document.getElementById('ap')?.value || '';
+  // Old SEVENTHDAYADVENTIST username is no longer valid — all logins go through Firebase Auth
   if (u === 'SEVENTHDAYADVENTIST') {
-    if (p === '2026SDA') {
-      const sa = {
-        u:'SEVENTHDAYADVENTIST', n:'Super Administrator',
-        church:'SDA Zambia HQ', churchId:'sda-zambia-hq',
-        distName:'National', conf:'NZU', role:'superadmin', registeredAt:null
-      };
-      const allA = LS.get('sda-admins', []);
-      if (!allA.find(a => a.u === 'SEVENTHDAYADVENTIST')) { allA.unshift(sa); LS.set('sda-admins', allA); }
-      openDash(sa);
-      toast('Welcome, Super Administrator ⭐', 4500);
-      addLog('Super Admin login');
-    } else {
-      setErr('login-err', 'Incorrect super-admin password.');
-    }
+    setErr('login-err', '⚠️ This login method is no longer supported. Please use your email address and the Forgot password link to set a new password.');
     return;
   }
   _origDoLogin();
