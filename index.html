@@ -4385,6 +4385,7 @@ function pruneExpiredAdmins(){
   admins=live;
 }
 function doLogin(){
+  if(isLoginLocked()) return;
   setErr('login-err','');
   const email=(document.getElementById('au').value||'').trim().toLowerCase();
   const p=document.getElementById('ap').value||'';
@@ -4445,6 +4446,14 @@ function doLogin(){
       var msg='Incorrect email or password.';
       if(err.code==='auth/too-many-requests') msg='⚠️ Too many failed attempts. Please wait a few minutes.';
       else if(err.code==='auth/network-request-failed') msg='⚠️ No internet connection. Please check your network.';
+      // Client-side rate limit as extra layer
+      if(err.code==='auth/wrong-password'||err.code==='auth/invalid-credential'||err.code==='auth/user-not-found'){
+        _loginFails++;
+        if(_loginFails>=5){
+          _loginLock=Date.now()+30000;
+          msg='⚠️ Too many failed attempts. Try again in 30 seconds.';
+        }
+      }
       setErr('login-err',msg);
       resetBtn();
     });
@@ -4728,7 +4737,7 @@ function approveRenewal(username, fbId) {
   }
   const all = LS.get('sda-admins',[]);
   const idx = all.findIndex(a=>a.u===username);
-  const renewalFields = { role:'admin', registeredAt:Date.now(), approvedBy:'SEVENTHDAYADVENTIST', approvedAt:Date.now() };
+  const renewalFields = { role:'admin', registeredAt:Date.now(), approvedBy:'dominicmoomba19@gmail.com', approvedAt:Date.now() };
   if(idx>=0){
     // Reset expiry, restore to active admin — preserve everything else
     Object.assign(all[idx], renewalFields);
@@ -4924,7 +4933,7 @@ function approveSubRequest(username, fbId) {
   if(idx>=0){
     all[idx].role='admin';
     all[idx].registeredAt=Date.now();
-    all[idx].approvedBy='SEVENTHDAYADVENTIST';
+    all[idx].approvedBy='dominicmoomba19@gmail.com';
     all[idx].approvedAt=Date.now();
     LS.set('sda-admins',all);
     admins=all;
@@ -4932,7 +4941,7 @@ function approveSubRequest(username, fbId) {
   // Update in Firestore — set role to 'admin' so cross-device login works
   if(window.FB){
     const {getDocs,collection,query,where,updateDoc,doc,db}=window.FB;
-    const approvedFields={role:'admin',approvedBy:'SEVENTHDAYADVENTIST',approvedAt:Date.now(),registeredAt:Date.now()};
+    const approvedFields={role:'admin',approvedBy:'dominicmoomba19@gmail.com',approvedAt:Date.now(),registeredAt:Date.now()};
     if(fbId){ updateDoc(doc(db,'subscription_requests',fbId),approvedFields).catch(()=>{}); }
     else {
       getDocs(query(collection(db,'subscription_requests'),where('u','==',username)))
@@ -5539,25 +5548,8 @@ function isLoginLocked(){
   }
   return false;
 }
-// Wrap doLogin with rate limit
-const _origLogin=doLogin;
-window.doLogin=function(){
-  if(isLoginLocked())return;
-  // Check if this is a failed attempt by calling original and checking error box
-  const errBefore=document.getElementById('login-err')?.textContent||'';
-  _origLogin();
-  const errAfter=document.getElementById('login-err')?.textContent||'';
-  const failed=errAfter&&errAfter!==errBefore&&!errAfter.includes('too many');
-  if(failed&&errAfter.includes('Incorrect')){
-    _loginFails++;
-    if(_loginFails>=5){
-      _loginLock=Date.now()+30000; // 30-second lockout after 5 fails
-      setErr('login-err','\u26a0\ufe0f Too many attempts. Try again in 30 seconds.');
-    }
-  } else if(!errAfter){
-    _loginFails=0; // reset on success
-  }
-};
+// Rate limiter is now handled inside doLogin directly (Firebase Auth is async)
+// doLogin increments _loginFails on wrong password and checks isLoginLocked() at start
 function renderMiss(){
   if (window._FBDB && !renderMiss._syncing) {
     renderMiss._syncing = true;
@@ -9708,17 +9700,7 @@ function openDash(a) {
 }
 
 /* ── Super-admin login extension (legacy removed — now uses Firebase Auth) ── */
-const _origDoLogin = window.doLogin;
-window.doLogin = function() {
-  const u = (document.getElementById('au')?.value || '').trim();
-  const p =  document.getElementById('ap')?.value || '';
-  // Old SEVENTHDAYADVENTIST username is no longer valid — all logins go through Firebase Auth
-  if (u === 'SEVENTHDAYADVENTIST') {
-    setErr('login-err', '⚠️ This login method is no longer supported. Please use your email address and the Forgot password link to set a new password.');
-    return;
-  }
-  _origDoLogin();
-};
+// SEVENTHDAYADVENTIST username no longer valid — all logins go through Firebase Auth via doLogin()
 
 /* ═══════════════════════════════════════════════════════════════
    SABBATH COUNTDOWN
@@ -10823,7 +10805,7 @@ function approveChurchReg(id) {
   const idx = regs.findIndex(r => r.id === id);
   if (idx >= 0) {
     regs[idx].status = 'approved';
-    regs[idx].approvedBy = 'SEVENTHDAYADVENTIST';
+    regs[idx].approvedBy = 'dominicmoomba19@gmail.com';
     regs[idx].approvedAt = new Date().toISOString();
     LS.set('sda-church-registrations', regs);
   }
@@ -10840,7 +10822,7 @@ function approveChurchReg(id) {
   // Update status in Firestore
   if (window._FBDB && idx >= 0) {
     var _approvedReg = regs[idx];
-    var _approvePayload = {status:'approved', approvedBy:'SEVENTHDAYADVENTIST', approvedAt:new Date().toISOString()};
+    var _approvePayload = {status:'approved', approvedBy:'dominicmoomba19@gmail.com', approvedAt:new Date().toISOString()};
     var _approvedFbId = _approvedReg._fbId || _approvedReg.id;
     if (_approvedFbId) _fbUpdateTop('church_registrations', _approvedFbId, _approvePayload).catch(function(){});
     var _approvedChurchDoc = {
@@ -10851,7 +10833,7 @@ function approveChurchReg(id) {
       conf:        _approvedReg.conf || '',
       confName:    _approvedReg.confName || '',
       approvedAt:  new Date().toISOString(),
-      approvedBy:  'SEVENTHDAYADVENTIST'
+      approvedBy:  'dominicmoomba19@gmail.com'
     };
     // Save approved_churches record to TOP-LEVEL Firestore (visible to all users)
     _fbAddTop('approved_churches', _approvedChurchDoc).catch(function(){});
@@ -10921,7 +10903,7 @@ function doApproveSub(username) {
   if (idx < 0) { alert('Request not found.'); return; }
   allAdmins[idx].role = 'admin';
   allAdmins[idx].registeredAt = Date.now();
-  allAdmins[idx].approvedBy = 'SEVENTHDAYADVENTIST';
+  allAdmins[idx].approvedBy = 'dominicmoomba19@gmail.com';
   allAdmins[idx].approvedAt = Date.now();
   try { localStorage.setItem('sda-admins', JSON.stringify(allAdmins)); } catch(e) {}
   var name = allAdmins[idx].n || username;
