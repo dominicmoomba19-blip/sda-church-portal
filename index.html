@@ -264,10 +264,20 @@ function _fbUpdateTop(col, id, data) {
       storage: null,
       collection: _col,
       doc: _doc,
-      query: function(c) { return c; },
+      query: function(c) {
+        var ref = c._ref;
+        var args = Array.prototype.slice.call(arguments, 1);
+        args.forEach(function(constraint) {
+          if (!constraint) return;
+          if (constraint._type === 'fbwhere') ref = ref.where(constraint.f, constraint.op, constraint.v);
+          if (constraint._type === 'fborder') ref = ref.orderBy(constraint.f, constraint.d);
+          if (constraint._type === 'fblimit') ref = ref.limit(constraint.n);
+        });
+        return { _type: 'fbcol', _ref: ref, _name: c._name };
+      },
       where: function(f, op, v) { return { _type: 'fbwhere', f: f, op: op, v: v }; },
-      orderBy: function(f, d) { return null; },
-      limit: function(n) { return null; },
+      orderBy: function(f, d) { return { _type: 'fborder', f: f, d: d||'asc' }; },
+      limit: function(n) { return { _type: 'fblimit', n: n }; },
       serverTimestamp: function() { return firebase.firestore.FieldValue.serverTimestamp(); },
       onSnapshot: function() { return function(){}; },
       addDoc: function(colRef, data) {
@@ -3710,7 +3720,7 @@ function hidePicker(){
 
 // ── Admin-only: unlock a member's church selection ─────────────
 function adminUnlockChurch(){
-  if(!currentAdmin&&!isSuperAdmin(currentAdmin)){
+  if(!currentAdmin || !isApprovedAdmin(currentAdmin)){
     toast('⚠️ Admin access required.');
     return;
   }
@@ -4977,6 +4987,7 @@ window.renderSubBadge = renderSubBadge;
 
 function doLogout(){
   currentAdmin=null;
+  currentMember=null; // clear member session too so UI state doesn't desync
   if(window._FBAUTH) window._FBAUTH.signOut().catch(function(){});
   try{ localStorage.removeItem('sda-admin-session'); }catch(_){}
   document.getElementById('adash').style.display='none';
@@ -5197,7 +5208,7 @@ function addAct(){
   const timeVal=document.getElementById('aatime').value;
   const rec=document.getElementById('aarec').value.trim();
   const i=document.getElementById('aai').value.trim()||'\uD83D\uDCC5';
-  const scope=document.getElementById('aascope').value;
+  let scope=document.getElementById('aascope').value;
 
   // Basic content validation
   if(!n||!d){toast('\u26a0\ufe0f Please fill in Name and Description');return;}
@@ -5301,11 +5312,18 @@ function renderMyActs(){
     </div>`).join(''):'<div class="empty"><span class="empty-ico">📅</span><strong>No activities posted yet</strong><p>Use the form above to post your first church activity.</p></div>';
 }
 function delAct(id){
-  if(!confirm('Delete this activity? This cannot be undone.'))return;
+  if(window._delActPending!==id){
+    window._delActPending=id;
+    setTimeout(function(){window._delActPending=null;},4000);
+    toast('⚠️ Tap Delete again to confirm',4000);
+    return;
+  }
+  window._delActPending=null;
   const extra=LS.get('x-acts',[]).filter(a=>a.id!==id);
   LS.set('x-acts',extra);
+  if(window.FB){const {getDocs,collection,query,where,deleteDoc,doc,db}=window.FB;getDocs(query(collection(db,'activities'),where('id','==',id))).then(function(snap){snap.forEach(function(d){deleteDoc(doc(db,'activities',d.id)).catch(function(){});});}).catch(function(){});}
   toast('Activity removed');
-  renderActsList._lastSync = 0; // bust cache so next render fetches fresh
+  renderActsList._lastSync = 0;
   renderMyActs();renderActs();updStats();
 }
 function shareAct(id){
@@ -9068,6 +9086,9 @@ function memRegister() {
   LS.set('sda-member-session', { id: nm.id, phone: nm.phone });
   syncMemberChurchContext(nm);
 
+  // Save to Firestore so member can log in from any device
+  _fbAdd('members', nm).catch(() => {});
+
   renderMemberProfile();
   toast('Welcome, ' + n + ' 🙏 Account created!');
   addLog('Member registered: ' + n + ' @ ' + regChurch);
@@ -9094,23 +9115,38 @@ function memLogin() {
     (m.name || '').toLowerCase() === u.toLowerCase()
   );
 
-  if (!found) {
-    setErr('m-login-err', 'No account found for that phone/username. Please register first.');
+  function _doMemLogin(record) {
+    currentMember = record;
+    LS.set('sda-member-session', { id: record.id, phone: record.phone });
+    // Merge back into local store so next load is instant
+    const all = LS.get('sda-members', []);
+    const idx = all.findIndex(m => m.id === record.id);
+    if (idx >= 0) all[idx] = record; else all.push(record);
+    LS.set('sda-members', all);
+    syncMemberChurchContext(record);
+    renderMemberProfile();
+    toast('Welcome back, ' + record.name + ' 👋');
+    addLog('Member login: ' + record.name);
+  }
+
+  if (found) {
+    if (!checkPw(pw, found.passwordHash)) {
+      setErr('m-login-err', 'Incorrect password — please try again.');
+      return;
+    }
+    _doMemLogin(found);
     return;
   }
 
-  if (!checkPw(pw, found.passwordHash)) {
-    setErr('m-login-err', 'Incorrect password — please try again.');
-    return;
-  }
-
-  currentMember = found;
-  LS.set('sda-member-session', { id: found.id, phone: found.phone });
-  syncMemberChurchContext(found);
-
-  renderMemberProfile();
-  toast('Welcome back, ' + found.name + ' 👋');
-  addLog('Member login: ' + found.name);
+  // Not in localStorage — try Firestore (member registered on another device)
+  _fbGetDocs('members', { phone: u }).then(function(rows) {
+    const fbFound = rows.find(m => m.phone === u || (m.name||'').toLowerCase() === u.toLowerCase());
+    if (!fbFound) { setErr('m-login-err', 'No account found for that phone/username. Please register first.'); return; }
+    if (!checkPw(pw, fbFound.passwordHash)) { setErr('m-login-err', 'Incorrect password — please try again.'); return; }
+    _doMemLogin(fbFound);
+  }).catch(function() {
+    setErr('m-login-err', 'No account found locally and could not reach server. Please check your connection.');
+  });
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -9351,6 +9387,7 @@ function memberSubmitActivity() {
     status:         'pending'
   });
   LS.set('sda-act-queue', queue);
+  _fbAdd('act_queue', queue[queue.length - 1]).catch(() => {});
 
   toast('✅ Activity submitted — awaiting church admin review.');
   addLog('Member activity submitted: ' + name);
@@ -9391,6 +9428,8 @@ function submitPrayer() {
   env.name   = priv === 'Anonymous' ? 'Anonymous' : nm || env.postedBy || 'Church Member';
   env.id     = 'p' + Date.now();
   env.time   = env.postedAt;
+  env.church = (currentAdmin && currentAdmin.church) || (currentMember && currentMember.church) ||
+    (() => { try { return JSON.parse(localStorage.getItem('sda-church')||'null')?.church||''; } catch(_){return '';} })();
   const key  = 'sda-prayers-' + env.churchId;
   const arr  = LS.get(key, []).filter(p => !p.expiresAt || p.expiresAt > Date.now());
   arr.push(env);
@@ -9399,8 +9438,8 @@ function submitPrayer() {
   document.getElementById('p-req').value  = '';
   toast('🙏 Prayer submitted!');
   renderPrayerList(arr, document.getElementById('pl'));
-  _fbAdd('prayers', env).catch(() => {});
-  if(window._FBDB){ _fbAdd('prayers', env).catch(function(){}); }
+  updStats();
+  _fbAdd('prayers', env).catch(() => {}); // single Firestore write
 }
 
 function loadFirestorePrayers(churchId) {
@@ -9556,16 +9595,20 @@ function approveActQueue(id) {
   LS.set('sda-act-queue', queue);
 
   const extra = LS.get('x-acts', []);
-  extra.push({
+  const approved = {
     id: 'a' + Date.now(), icon: a.icon, title: a.title, desc: a.desc,
     time: a.time, eventDate: a.eventDate, scope: 'church',
     churchId: a.churchId, churchKey: a.church,
     conf:     admin?.conf    || null,
     distKey:  admin?.distId  || null,
     postedBy: a.submittedBy + ' (member)',
-    postedAt: new Date().toLocaleString()
-  });
+    postedAt: new Date().toLocaleString(),
+    postedAtMs: Date.now(),
+    expiresAt: Date.now() + WEEK_MS
+  };
+  extra.push(approved);
   LS.set('x-acts', extra);
+  if(window.FB){const {addDoc,collection,serverTimestamp,db}=window.FB;addDoc(collection(db,'activities'),Object.assign({},approved,{ts:serverTimestamp()})).catch(()=>{});}
   renderAdminActQueue();
   renderActs();
   toast('✅ Activity approved and published!');
