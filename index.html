@@ -6120,16 +6120,19 @@ function toEmbedURL(url){
   // Returns a known-safe embed URL built entirely from extracted data,
   // never from raw user input. Returns null if URL can't be safely embedded.
   try{
-    const host=new URL(url).hostname.toLowerCase();
-    if(host==='youtube.com'||host==='www.youtube.com'||host==='youtu.be'){
-      const id=extractYouTubeId(url);
+    // Normalise: add https:// if the user pasted a bare URL without a protocol
+    var _url=url.trim();
+    if(!/^https?:\/\//i.test(_url)) _url='https://'+_url;
+    const host=new URL(_url).hostname.toLowerCase();
+    if(host==='youtube.com'||host==='www.youtube.com'||host==='m.youtube.com'||host==='youtu.be'){
+      const id=extractYouTubeId(_url);
       if(!id)return null; // no parseable video ID — refuse
       // Construct from our own template, zero user-supplied strings in output
       return 'https://www.youtube.com/embed/'+id+'?rel=0&modestbranding=1';
     }
     if(host==='facebook.com'||host==='www.facebook.com'||host==='fb.watch'){
       // Facebook embeds need the full URL but it's safely encoded
-      return 'https://www.facebook.com/plugins/video.php?href='+encodeURIComponent(url)+'&show_text=0&autoplay=1';
+      return 'https://www.facebook.com/plugins/video.php?href='+encodeURIComponent(_url)+'&show_text=0&autoplay=1';
     }
   }catch{}
   return null;
@@ -6224,10 +6227,12 @@ function isAllowedStreamURL(u){
   // Must start with https://, domain must be exactly youtube.com, youtu.be,
   // facebook.com, or fb.watch (with optional www. prefix only).
   // Rejects look-alikes like youtube.com.evil.com or fakeyoutube.com.
-  if(!u||!u.startsWith('https://'))return false;
+  if(!u)return false;
+  var _u=u.trim();
+  if(!/^https?:\/\//i.test(_u)) _u='https://'+_u;
   try{
-    const host=new URL(u).hostname.toLowerCase();
-    const ok=['youtube.com','www.youtube.com','youtu.be','facebook.com','www.facebook.com','fb.watch'];
+    const host=new URL(_u).hostname.toLowerCase();
+    const ok=['youtube.com','www.youtube.com','m.youtube.com','youtu.be','facebook.com','www.facebook.com','fb.watch'];
     return ok.includes(host);
   }catch{return false;}
 }
@@ -6235,7 +6240,6 @@ function quickLaunch(){
   const v=document.getElementById('qurl').value.trim();
   const err=document.getElementById('stream-err');
   if(!v){err.textContent='Please paste a URL first.';err.classList.add('on');return}
-  if(!v.startsWith('https://')){err.textContent='URL must start with https://';err.classList.add('on');return}
   if(!isAllowedStreamURL(v)){err.textContent='Only YouTube (youtube.com / youtu.be) and Facebook URLs are supported.';err.classList.add('on');return}
   err.classList.remove('on');
   window._manualStream=true; // flag: user pasted this URL manually
