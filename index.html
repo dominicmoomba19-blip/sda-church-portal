@@ -11361,8 +11361,24 @@ function _campRegRenderCard(open) {
 }
 
 window.campRegTileClick = function() {
+  // Open immediately from localStorage — don't wait for Firestore
+  var openNow = _campRegIsOpen();
+  if (!openNow) {
+    // Still check cloud quickly in case it was just opened
+    _campRegLoadCloud(function(open) {
+      if (open) { typeof nav === 'function' && nav('camp-register'); }
+      else { typeof toast === 'function' && toast('🔒 Event registration is currently closed.'); }
+    });
+    return;
+  }
+  // Open the page instantly, confirm with cloud in background
+  typeof nav === 'function' && nav('camp-register');
   _campRegLoadCloud(function(open) {
-    open ? (typeof nav === 'function' && nav('camp-register')) : (typeof toast === 'function' && toast('🔒 Event registration is currently closed.'));
+    if (!open) {
+      // Was open locally but cloud says closed — go back
+      typeof toast === 'function' && toast('🔒 Event registration has been closed.');
+      typeof nav === 'function' && nav('home');
+    }
   });
 };
 
