@@ -3684,7 +3684,8 @@ function showPicker(){
     return;
   }
   // Guest with a locked church: block picker unless admin unlocks
-  if(LS.get('sda-church-locked', false)){
+  // Superadmin is exempt — they can freely switch between any church
+  if(!(currentAdmin && isSuperAdmin(currentAdmin)) && LS.get('sda-church-locked', false)){
     toast('🔒 Church locked. An admin can unlock your church selection.');
     return;
   }
@@ -3971,7 +3972,8 @@ function pickChurch(churchName){
     dist:selectedDist?selectedDist.id:'',
     distName:selectedDist?selectedDist.name:''
   });
-  LS.set('sda-church-locked', true);
+  // Superadmin must never be church-locked — they browse freely across all churches
+  if(!(currentAdmin && isSuperAdmin(currentAdmin))) LS.set('sda-church-locked', true);
   // Save conference for Cloudinary + Firestore routing
   try { localStorage.setItem('selectedConference', selectedConf||''); } catch(e) {}
   // Always switch to "My Church" tab when user explicitly picks a church
@@ -4009,7 +4011,7 @@ function pickManualChurch(){
     dist:selectedDist?selectedDist.id:'',
     distName:selectedDist?selectedDist.name:''
   });
-  LS.set('sda-church-locked', true);
+  if(!(currentAdmin && isSuperAdmin(currentAdmin))) LS.set('sda-church-locked', true);
   try { localStorage.setItem('selectedConference', selectedConf||''); } catch(e) {}
   actsFilter='mine';
   LS.set('sda-acts-filter','mine');
@@ -4314,6 +4316,10 @@ function openDash(a){
   // Regular admins: church locked to their registered church
   // Superadmin: keep whatever church they last picked (don't override)
   const _lockChurch = !isSuperAdmin(a);
+  if(!_lockChurch){
+    // Superadmin must never be church-locked — clear any stale lock from a previous session
+    LS.set('sda-church-locked', false);
+  }
   if(_lockChurch && a.church){
     selectedChurch=a.church;
     selectedChurchId=a.churchId||makeChurchId(a.church);
