@@ -1778,8 +1778,8 @@ textarea.finp { resize:vertical; min-height:90px; }
     <div class="sfrm" id="sfrm"></div>
   </div>
   <div class="stbar" id="stbar"><div class="sttl" id="stttl"></div><div class="sdsc" id="stdsc"></div></div>
-  <div class="card" id="stream-launch-box" style="margin-bottom:12px;display:none">
-    <p style="font-size:13px;color:var(--text);font-weight:600;margin-bottom:9px">📺 Start or watch a stream:</p>
+  <div class="card" style="margin-bottom:12px">
+    <p style="font-size:13px;color:var(--text);font-weight:600;margin-bottom:9px">📺 Watch a stream:</p>
     <div class="uhelp">
       <strong>Paste any of these URL formats:</strong>
       · YouTube watch: <code>youtube.com/watch?v=ID</code> — auto-converts<br>
@@ -2000,26 +2000,8 @@ textarea.finp { resize:vertical; min-height:90px; }
         <button class="anb" id="mem-approval-tab" onclick="swSec(this,'mem-approval')"><span class="ai">👥</span>Members</button>
         <button class="anb" id="camp-regs-tab" onclick="swSec(this,'camp-regs'); renderAdminCampRegs(); window.renderRegLock();"><span class="ai">📋</span>Event Regs</button>
         <button class="anb" id="subs-tab" style="display:none" onclick="swSec(this,'subs'); renderSubRequests();"><span class="ai">💳</span>Subscriptions<span id="subs-badge" style="display:none;background:var(--crim2);color:#fff;font-size:9px;font-weight:700;border-radius:8px;padding:1px 5px;margin-left:4px">0</span></button>
-        <button class="anb" id="sa-feed-tab" style="display:none" onclick="swSec(this,'sa-feed'); renderSAFeed();"><span class="ai">📡</span>All Posts<span id="sa-feed-badge" style="display:none;background:var(--em);color:#fff;font-size:9px;font-weight:700;border-radius:8px;padding:1px 6px;margin-left:4px">NEW</span></button>
+        
 
-      </div>
-
-      <!-- ALL POSTS FEED (SuperAdmin only) -->
-      <div id="sec-sa-feed" style="display:none">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-          <div style="font-size:14px;font-weight:700;color:var(--text)">📡 All Posts Across Churches</div>
-          <button onclick="renderSAFeed()" style="background:var(--card2);border:1px solid var(--bor2);border-radius:8px;padding:6px 12px;font-size:11px;font-weight:700;color:var(--text2);cursor:pointer">🔄 Refresh</button>
-        </div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px" id="sa-feed-filters">
-          <button onclick="setSAFeedFilter('all')" class="sa-ff on" data-f="all" style="background:var(--teal);color:#fff;border:none;border-radius:20px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer">All</button>
-          <button onclick="setSAFeedFilter('activities')" class="sa-ff" data-f="activities" style="background:var(--card2);border:1px solid var(--bor2);border-radius:20px;padding:5px 12px;font-size:11px;font-weight:600;color:var(--text2);cursor:pointer">📅 Activities</button>
-          <button onclick="setSAFeedFilter('prayers')" class="sa-ff" data-f="prayers" style="background:var(--card2);border:1px solid var(--bor2);border-radius:20px;padding:5px 12px;font-size:11px;font-weight:600;color:var(--text2);cursor:pointer">🙏 Prayers</button>
-          <button onclick="setSAFeedFilter('prayerwall')" class="sa-ff" data-f="prayerwall" style="background:var(--card2);border:1px solid var(--bor2);border-radius:20px;padding:5px 12px;font-size:11px;font-weight:600;color:var(--text2);cursor:pointer">🕊️ Prayer Wall</button>
-          <button onclick="setSAFeedFilter('requests')" class="sa-ff" data-f="requests" style="background:var(--card2);border:1px solid var(--bor2);border-radius:20px;padding:5px 12px;font-size:11px;font-weight:600;color:var(--text2);cursor:pointer">📝 Requests</button>
-          <button onclick="setSAFeedFilter('testimonies')" class="sa-ff" data-f="testimonies" style="background:var(--card2);border:1px solid var(--bor2);border-radius:20px;padding:5px 12px;font-size:11px;font-weight:600;color:var(--text2);cursor:pointer">✨ Testimonies</button>
-          <button onclick="setSAFeedFilter('missions')" class="sa-ff" data-f="missions" style="background:var(--card2);border:1px solid var(--bor2);border-radius:20px;padding:5px 12px;font-size:11px;font-weight:600;color:var(--text2);cursor:pointer">🌍 Missions</button>
-        </div>
-        <div id="sa-feed-list"><div style="text-align:center;padding:30px;color:var(--text3);font-size:13px">⏳ Loading posts...</div></div>
       </div>
 
       <!-- MEDIA -->
@@ -3669,18 +3651,7 @@ function nav(p){
     }
   }
   // Restore any active stream when navigating to the live page
-  if(p==='live'){
-    restoreActiveStream();
-    startStreamPolling(selectedChurchId||'');
-    // Only show the stream launch box to admins
-    var _launchBox = document.getElementById('stream-launch-box');
-    if(_launchBox) _launchBox.style.display = (typeof currentAdmin !== 'undefined' && currentAdmin && typeof isApprovedAdmin === 'function' && isApprovedAdmin(currentAdmin)) ? 'block' : 'none';
-    // Update the offline hint text for members
-    var _soff = document.getElementById('soff');
-    if(_soff && !(typeof currentAdmin !== 'undefined' && currentAdmin && typeof isApprovedAdmin === 'function' && isApprovedAdmin(currentAdmin))){
-      _soff.querySelector('span:last-child') && (_soff.querySelector('span:last-child').textContent = 'Return during service time to watch.');
-    }
-  }
+  if(p==='live'){restoreActiveStream();startStreamPolling(selectedChurchId||'');}
   else{stopStreamPolling();}
 }
 
@@ -4374,15 +4345,6 @@ function openDash(a){
   const _subsTab = document.getElementById('subs-tab');
   if (_subsTab) _subsTab.style.display = (a && isSuperAdmin(a)) ? 'inline-flex' : 'none';
   updStats();renderAdmins();refreshAdmChurchContext();
-  // Show SuperAdmin-only tabs
-  var feedTab=document.getElementById('sa-feed-tab');
-  var subsTab=document.getElementById('subs-tab');
-  if(isSuperAdmin(a)){
-    if(feedTab) feedTab.style.display='';
-    if(subsTab) subsTab.style.display='';
-  } else {
-    if(feedTab) feedTab.style.display='none';
-  }
   renderMyActs();
   // Render admin media panels filtered to this admin's church only
   renderAdminMediaPanels();
@@ -9657,7 +9619,7 @@ function swSec(btn, sec) {
     }
   }
   const all = ['media','acts','miss','stream','pa','ra','log','adms','subs',
-                'attendance-adm','give-adm','mem-approval','camp-regs','sa-feed'];
+                'attendance-adm','give-adm','mem-approval','camp-regs'];
   all.forEach(s => { const x = document.getElementById('sec-'+s); if (x) x.style.display='none'; });
   const target = document.getElementById('sec-' + sec);
   if (target) target.style.display = 'block';
@@ -9675,7 +9637,6 @@ function swSec(btn, sec) {
   if (sec==='mem-approval')   (window.renderAdminMemberApproval||renderAdminMemberApproval)?.();
   if (sec==='camp-regs')      { (window.renderAdminCampRegs||renderAdminCampRegs)?.(); if (typeof window.renderRegLock === 'function') window.renderRegLock(); }
   if (sec==='media'||sec==='stream') { if(typeof refreshAdmChurchContext==='function') refreshAdmChurchContext(); if(sec==='media'&&typeof refreshMediaStorageBadge==='function') refreshMediaStorageBadge(); }
-  if (sec==='sa-feed') renderSAFeed();
 }
 
 /* ── Extend openDash to refresh approval badge ───────────────────── */
@@ -9911,108 +9872,6 @@ document.addEventListener('DOMContentLoaded', function() {
     _campRegLoadCloud(function(open) { _campRegUpdateTile(open); }); // confirm with cloud
   }
 });
-
-/* ── SUPERADMIN ALL-POSTS FEED ───────────────────────────────── */
-var _saFeedFilter = 'all';
-var _saFeedLoading = false;
-
-function setSAFeedFilter(f) {
-  _saFeedFilter = f;
-  document.querySelectorAll('.sa-ff').forEach(function(b){
-    var isOn = b.getAttribute('data-f') === f;
-    b.style.background = isOn ? 'var(--teal)' : 'var(--card2)';
-    b.style.color = isOn ? '#fff' : 'var(--text2)';
-    b.style.border = isOn ? 'none' : '1px solid var(--bor2)';
-  });
-  renderSAFeedFromCache();
-}
-
-var _saFeedCache = [];
-
-function renderSAFeedFromCache() {
-  var list = document.getElementById('sa-feed-list');
-  if (!list) return;
-  var items = _saFeedFilter === 'all' ? _saFeedCache
-    : _saFeedCache.filter(function(i){ return i._col === _saFeedFilter; });
-  if (!items.length) {
-    list.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text3);font-size:13px">No posts found.</div>';
-    return;
-  }
-  var icons = { activities:'📅', prayers:'🙏', prayerwall:'🕊️', requests:'📝', testimonies:'✨', missions:'🌍' };
-  var labels = { activities:'Activity', prayers:'Prayer Request', prayerwall:'Prayer Wall', requests:'Request', testimonies:'Testimony', missions:'Mission' };
-  list.innerHTML = items.map(function(item) {
-    var icon = icons[item._col] || '📄';
-    var label = labels[item._col] || item._col;
-    var church = item.church || item.churchId || item.churchName || '—';
-    var body = item.body || item.req || item.msg || item.text || item.title || item.n || '—';
-    if (body.length > 120) body = body.slice(0,120) + '…';
-    var ts = item.postedAtMs || item.registeredAt || item.ts || null;
-    var timeStr = ts ? new Date(ts).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : '';
-    var admin = item.postedBy || item.adminName || item.n || '';
-    return '<div style="background:var(--card2);border:1px solid var(--bor2);border-radius:12px;padding:12px 14px;margin-bottom:10px">'
-      + '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">'
-      + '<div style="display:flex;align-items:center;gap:7px">'
-      + '<span style="font-size:18px">' + icon + '</span>'
-      + '<div><div style="font-size:12px;font-weight:700;color:var(--text)">' + label + '</div>'
-      + '<div style="font-size:10.5px;color:var(--teal);font-weight:600">🏛 ' + church + '</div></div></div>'
-      + '<div style="font-size:10px;color:var(--text3);text-align:right">' + timeStr + (admin ? '<br><span style="color:var(--text3)">by ' + admin + '</span>' : '') + '</div></div>'
-      + '<div style="font-size:12.5px;color:var(--text2);line-height:1.55">' + body + '</div>'
-      + '</div>';
-  }).join('');
-}
-
-function renderSAFeed() {
-  if (!isSuperAdmin()) return;
-  var list = document.getElementById('sa-feed-list');
-  if (!list) return;
-  if (_saFeedLoading) return;
-  _saFeedLoading = true;
-  list.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text3);font-size:13px">⏳ Loading posts from all churches...</div>';
-
-  var FB = window.FB;
-  if (!FB) {
-    list.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text3);font-size:13px">⚠️ No connection to database.</div>';
-    _saFeedLoading = false; return;
-  }
-
-  var cols = ['activities','prayers','prayerwall','requests','testimonies','missions'];
-  var all = [];
-  var done = 0;
-
-  cols.forEach(function(col) {
-    FB.getDocs(FB.query(FB.collection(FB.db, col), FB.limit(30)))
-      .then(function(snap) {
-        snap.forEach(function(d) {
-          var data = d.data();
-          data._col = col;
-          data._fbId = d.id;
-          all.push(data);
-        });
-      })
-      .catch(function(){})
-      .finally(function() {
-        done++;
-        if (done === cols.length) {
-          // Sort all by timestamp descending
-          all.sort(function(a,b){
-            var ta = a.postedAtMs || a.registeredAt || a.ts || 0;
-            var tb = b.postedAtMs || b.registeredAt || b.ts || 0;
-            return tb - ta;
-          });
-          _saFeedCache = all;
-          _saFeedLoading = false;
-          // Show NEW badge if there are recent posts (last 24h)
-          var recent = all.filter(function(i){ var t=i.postedAtMs||i.ts||0; return Date.now()-t < 86400000; });
-          var badge = document.getElementById('sa-feed-badge');
-          if (badge) { badge.style.display = recent.length ? '' : 'none'; }
-          renderSAFeedFromCache();
-        }
-      });
-  });
-}
-
-window.renderSAFeed = renderSAFeed;
-window.setSAFeedFilter = setSAFeedFilter;
 
 /* ═══════════════════════════════════════════════════════════════
    EXPOSE ALL v5 FUNCTIONS TO window
