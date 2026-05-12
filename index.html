@@ -1788,8 +1788,8 @@ textarea.finp { resize:vertical; min-height:90px; }
     <div class="sfrm" id="sfrm"></div>
   </div>
   <div class="stbar" id="stbar"><div class="sttl" id="stttl"></div><div class="sdsc" id="stdsc"></div></div>
-  <div class="card" style="margin-bottom:12px">
-    <p style="font-size:13px;color:var(--text);font-weight:600;margin-bottom:9px">📺 Watch a stream:</p>
+  <div class="card" style="margin-bottom:12px;display:none" id="stream-launch-card">
+    <p style="font-size:13px;color:var(--text);font-weight:600;margin-bottom:9px">📺 Admin stream controls:</p>
     <div class="uhelp">
       <strong>Paste any of these URL formats:</strong>
       · YouTube watch: <code>youtube.com/watch?v=ID</code> — auto-converts<br>
@@ -1798,8 +1798,8 @@ textarea.finp { resize:vertical; min-height:90px; }
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <input class="finp" id="qurl" style="flex:1;min-width:180px" type="url" placeholder="Paste YouTube or Facebook URL...">
-      <button class="btn btn-em" onclick="quickLaunch()" style="white-space:nowrap">▶ Watch</button>
-      <button class="btn btn-r" onclick="endStream()" id="end-btn" style="display:none;white-space:nowrap">⏹ Stop</button>
+      <button class="btn btn-em" onclick="quickLaunch()" style="white-space:nowrap">▶ Go Live</button>
+      <button class="btn btn-r" onclick="endStream()" id="end-btn" style="display:none;white-space:nowrap">⏹ End Stream</button>
     </div>
     <div class="errbox" id="stream-err"></div>
   </div>
@@ -4425,8 +4425,21 @@ function doLogin(){
   // Regular admins — old username/password system
   pruneExpiredAdmins();
   admins=LS.get('sda-admins',[]);
-  var found=admins.find(function(a){return a.u===u&&a.p===p;});
-  if(found&&found.role==='admin'&&!adminExpired(found)){ resetBtn(); _completeLogin(found); return; }
+  // Support both hashed (new) and plaintext (legacy) passwords — migrate on login
+  var found=admins.find(function(a){
+    if(a.u!==u) return false;
+    return a.passwordHash ? checkPw(p, a.passwordHash) : a.p===p;
+  });
+  if(found&&found.role==='admin'&&!adminExpired(found)){
+    // Migrate legacy plaintext password to hash silently
+    if(!found.passwordHash){
+      found.passwordHash=hashPw(p); delete found.p;
+      var _allM=LS.get('sda-admins',[]);
+      var _idxM=_allM.findIndex(function(a){return a.u===u;});
+      if(_idxM>=0){_allM[_idxM]=found;LS.set('sda-admins',_allM);}
+    }
+    resetBtn(); _completeLogin(found); return;
+  }
   if(found&&adminExpired(found)){
     var renewEl=document.getElementById('renew-user');
     if(renewEl)renewEl.value=u;
@@ -4441,7 +4454,8 @@ function doLogin(){
       .then(function(snap){
         var gsRecord=null;
         snap.forEach(function(d){ var data=d.data(); if(data.role==='admin'){data._gsId=d.id;gsRecord=data;} });
-        if(gsRecord&&gsRecord.p===p){
+        var _pwMatch = gsRecord && (gsRecord.passwordHash ? checkPw(p, gsRecord.passwordHash) : gsRecord.p===p);
+        if(_pwMatch){
           var all=LS.get('sda-admins',[]);
           var idx=all.findIndex(function(a){return a.u===u;});
           if(idx>=0)all[idx]=Object.assign(all[idx],gsRecord);else all.push(gsRecord);
@@ -4494,6 +4508,7 @@ function _completeLogin(found){
   }
   const dl=adminDaysLeft(found);
   openDash(found);
+  const _slc=document.getElementById('stream-launch-card');if(_slc)_slc.style.display='block';
   toast('Welcome back, '+found.n+' 👋'+(dl!==null?' · '+dl+' day'+(dl!==1?'s':'')+' remaining':''),4500);
   addLog('Login: '+found.n+(dl!==null?' ('+dl+'d left)':''));
 }
@@ -4590,14 +4605,14 @@ function submitSubscription() {
   if(churchTaken){ subErr('⚠️ An admin account already exists for '+church+'. Each church can only have one admin. Contact your existing admin or THABO1 if there is an issue.','sub-church'); return; }
   const dist = distById(distId);
   const req = {
-    u, p, n, church, churchId: makeChurchId(church),
+    u, passwordHash: hashPw(p), n, church, churchId: makeChurchId(church),
     distId, distName: dist?dist.name:'', conf,
     registeredAt: Date.now(),
     role: 'pending_admin',
     subTxn: txn, subPhone: phone,
     subSubmittedAt: Date.now(),
     subAmount: 500
-  };
+  }; // Note: password stored as hash — never plaintext
   const subBtn = document.getElementById('sub-btn') || document.querySelector('#af-s .btn-em');
   function resetSubBtn(){ if(subBtn){subBtn.disabled=false;subBtn.textContent='📨 Submit Payment Request';} }
   if(subBtn){subBtn.disabled=true;subBtn.textContent='⏳ Submitting...';}
@@ -4713,7 +4728,8 @@ function approveRenewal(username, fbId) {
   }
   const all = LS.get('sda-admins',[]);
   const idx = all.findIndex(a=>a.u===username);
-  const renewalFields = { role:'admin', registeredAt:Date.now(), approvedBy:'dominicmoomba19@gmail.com', approvedAt:Date.now() };
+  const _renewApprover = window._currentAdminRef ? window._currentAdminRef() : null;
+  const renewalFields = { role:'admin', registeredAt:Date.now(), approvedBy:(_renewApprover&&(_renewApprover.u||_renewApprover.email))||'superadmin', approvedAt:Date.now() };
   if(idx>=0){
     // Reset expiry, restore to active admin — preserve everything else
     Object.assign(all[idx], renewalFields);
@@ -4917,7 +4933,8 @@ function approveSubRequest(username, fbId) {
   // Update in Firestore — set role to 'admin' so cross-device login works
   if(window.FB){
     const {getDocs,collection,query,where,updateDoc,doc,db}=window.FB;
-    const approvedFields={role:'admin',approvedBy:'dominicmoomba19@gmail.com',approvedAt:Date.now(),registeredAt:Date.now()};
+    const _approver = (window._currentAdminRef ? window._currentAdminRef() : null);
+    const approvedFields={role:'admin',approvedBy:(_approver&&(_approver.u||_approver.email))||'superadmin',approvedAt:Date.now(),registeredAt:Date.now()};
     if(fbId){ updateDoc(doc(db,'subscription_requests',fbId),approvedFields).catch(()=>{}); }
     else {
       getDocs(query(collection(db,'subscription_requests'),where('u','==',username)))
@@ -4988,6 +5005,7 @@ window.renderSubBadge = renderSubBadge;
 function doLogout(){
   currentAdmin=null;
   currentMember=null; // clear member session too so UI state doesn't desync
+  const _slc2=document.getElementById('stream-launch-card');if(_slc2)_slc2.style.display='none';
   if(window._FBAUTH) window._FBAUTH.signOut().catch(function(){});
   try{ localStorage.removeItem('sda-admin-session'); }catch(_){}
   document.getElementById('adash').style.display='none';
@@ -6261,13 +6279,23 @@ function isAllowedStreamURL(u){
   }catch{return false;}
 }
 function quickLaunch(){
+  // Only approved admins can launch a stream visible to the church
+  if(!requireAdmin()) return;
   const v=document.getElementById('qurl').value.trim();
   const err=document.getElementById('stream-err');
   if(!v){err.textContent='Please paste a URL first.';err.classList.add('on');return}
   if(!isAllowedStreamURL(v)){err.textContent='Only YouTube (youtube.com / youtu.be) and Facebook URLs are supported.';err.classList.add('on');return}
   err.classList.remove('on');
-  window._manualStream=true; // flag: user pasted this URL manually
+  // Write to Firestore so all members see it (same as adminGoLive but without title/desc)
+  const churchId=currentAdmin?currentAdmin.churchId||makeChurchId(currentAdmin.church||''):(selectedChurchId||'');
+  const embedURL=toEmbedURL(v);
+  if(churchId&&embedURL){
+    const docId='stream_'+churchId;
+    _fbSet('streams',docId,{id:docId,churchId,url:v,embedURL,title:'',desc:'',active:true,startedAt:Date.now()}).catch(()=>{});
+  }
+  window._manualStream=true;
   startStream(v,'','');
+  toast('\uD83D\uDD34 Stream is live!');addLog('Quick launch by '+(currentAdmin?.n||'admin'));
 }
 function adminGoLive(){
   if (!requireAdmin()) return;
@@ -6278,8 +6306,6 @@ function adminGoLive(){
   const desc=document.getElementById('sdsc-a').value.trim();
   const churchId=currentAdmin?currentAdmin.churchId||makeChurchId(currentAdmin.church||''):(selectedChurchId||'');
   const embedURL=toEmbedURL(url);
-  // Write to Firebase so ALL members see the stream.
-  // Fixed doc ID per church — always the same row, never grows.
   if(churchId&&embedURL){
     const docId='stream_'+churchId;
     _fbSet('streams',docId,{id:docId,churchId,url,embedURL,title,desc,active:true,startedAt:Date.now()})
@@ -6292,20 +6318,22 @@ function endStream(){
   document.getElementById('sfrm').innerHTML='';document.getElementById('sfrm').style.display='none';
   document.getElementById('soff').style.display='flex';document.getElementById('stbar').style.display='none';
   document.getElementById('end-btn').style.display='none';
-  document.getElementById('live-st').textContent='Stream ended — thank you for joining!';
-  window._manualStream=false; // clear manual flag
-  // Clear persisted stream state
+  document.getElementById('live-st').textContent='Stream ended \u2014 thank you for joining!';
+  window._manualStream=false;
   const churchId=currentAdmin?currentAdmin.churchId||makeChurchId(currentAdmin.church||''):(selectedChurchId||'');
   if(churchId)try{localStorage.removeItem('sda-active-stream-'+churchId);}catch(e){}
-  // Mark stream inactive in Firebase so all members stop seeing it
-  if(churchId){
+  // Only admins can mark stream inactive in Firestore — guests closing just hide their local view
+  if(churchId && currentAdmin && isApprovedAdmin(currentAdmin)){
     const docId='stream_'+churchId;
     _fbSet('streams',docId,{active:false}).catch(()=>{});
+    toast('Stream ended');addLog('Stream ended by '+(currentAdmin?.n||'admin'));
+  } else {
+    toast('Stream closed');
   }
   const hd=document.getElementById('home-live-dot');if(hd)hd.style.display='none';
-  toast('Stream ended');addLog('Stream ended');
 }
 function setMode(m){
+  if(!requireAdmin()) return; // only admins can change church order mode
   chatMode=m;
   const lbls={o:'\uD83D\uDFE2 Open \u2014 Free Conversation',q:'\uD83D\uDD14 Quiet \u2014 Reverence Mode',s:'\uD83E\uDD2B Silent \u2014 Sermon Mode'};
   document.getElementById('mode-lbl').textContent=lbls[m];
@@ -6319,16 +6347,19 @@ function setMode(m){
     ci.removeAttribute('disabled'); // explicit removal — fixes stuck-disabled bug
     ci.maxLength=m==='q'?80:300;
     ci.placeholder=m==='q'?'Reverent message (max 80 chars)...':'Type a message...';
-    // Don't call .focus() here — mobile browsers ignore programmatic focus
-    // unless triggered directly by a tap on the element itself (iOS/Android quirk)
   }
-  // Also update the send-button state
   const sb=document.getElementById('send-btn');
   if(sb)sb.disabled=m==='s';
   toast(lbls[m]);
 }
-function pinMsg(){const t=document.getElementById('pin-t').value.trim();if(!t)return;addChat('📌 PINNED',t,true);document.getElementById('pin-t').value='';toast('Pinned!')}
-function sendAnn(){const t=document.getElementById('ann-t').value.trim();if(!t)return;addChat('📢 ADMIN',t,true);document.getElementById('ann-t').value='';toast('Announcement sent!')}
+function pinMsg(){
+  if(!requireAdmin()) return; // only admins can pin messages
+  const t=document.getElementById('pin-t').value.trim();if(!t)return;addChat('\uD83D\uDCCC PINNED',t,true);document.getElementById('pin-t').value='';toast('Pinned!')
+}
+function sendAnn(){
+  if(!requireAdmin()) return; // only admins can send announcements
+  const t=document.getElementById('ann-t').value.trim();if(!t)return;addChat('\uD83D\uDCE2 ADMIN',t,true);document.getElementById('ann-t').value='';toast('Announcement sent!')
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PUSH NOTIFICATIONS (FCM Web Push)
@@ -9158,12 +9189,27 @@ function loadMemberSession() {
 
   const members = LS.get('sda-members', []);
   const found   = members.find(m => m.id === sess.id && m.phone === sess.phone);
-  if (!found) return;
-
-  currentMember = found;
-  syncMemberChurchContext(found);
-  /* Re-render profile UI so the user sees they are logged in */
-  renderMemberProfile();
+  if (found) {
+    currentMember = found;
+    syncMemberChurchContext(found);
+    renderMemberProfile();
+    return;
+  }
+  // Not in localStorage (cleared or first load on new device) — try Firestore
+  _fbGetDocs('members', { id: sess.id }).then(function(rows) {
+    const fb = rows.find(function(m) { return m.id === sess.id && m.phone === sess.phone; });
+    if (!fb) { localStorage.removeItem('sda-member-session'); return; } // stale session
+    // Merge back into localStorage for faster future loads
+    const all = LS.get('sda-members', []);
+    if (!all.find(function(m) { return m.id === fb.id; })) all.push(fb);
+    LS.set('sda-members', all);
+    currentMember = fb;
+    syncMemberChurchContext(fb);
+    renderMemberProfile();
+  }).catch(function() {
+    // Firestore unreachable — silently leave session as-is; user will need to log in
+    localStorage.removeItem('sda-member-session');
+  });
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -9172,6 +9218,8 @@ function loadMemberSession() {
 function memLogout() {
   currentMember = null;
   try { localStorage.removeItem('sda-member-session'); } catch (_) {}
+  // Clear church lock so guest after logout can use the church picker freely
+  LS.set('sda-church-locked', false);
 
   const lw = document.getElementById('mem-login-wrap');
   const pw = document.getElementById('mem-profile-wrap');
@@ -9493,10 +9541,8 @@ function submitReq() {
   document.getElementById('r-msg').value  = '';
   toast('📝 Request submitted!');
   renderReqList(arr, document.getElementById('rl'));
-  // Save to Firebase for cross-device sync
-  _fbAdd('requests', env).catch(function(){});
-  // Save to Firestore for cross-device sync
-  if(window._FBDB){ _fbAdd('requests', env).catch(function(){}); }
+  updStats();
+  _fbAdd('requests', env).catch(function(){}); // single Firestore write
   // Save to Supabase backup
   if (SUPABASE_CONFIGURED && supabaseClient) {
     supabaseClient.from('requests').insert([{
@@ -9521,15 +9567,46 @@ function renderReqList(items, el) {
 /* ═══════════════════════════════════════════════════════════════
    ADMIN: MEMBER APPROVAL
    ═══════════════════════════════════════════════════════════════ */
-function renderMemberApprovalBadge() {}
+function renderMemberApprovalBadge() {
+  const admin = window._currentAdminRef ? window._currentAdminRef() : null;
+  if (!admin) return;
+  const count = LS.get('sda-members', []).filter(function(m) { return m.churchId === admin.churchId; }).length;
+  const badge = document.getElementById('mem-approval-badge');
+  if (badge) { badge.textContent = count > 0 ? count : ''; badge.style.display = count > 0 ? 'inline-flex' : 'none'; }
+}
 
 function renderAdminMemberApproval() {
   const admin = window._currentAdminRef ? window._currentAdminRef() : null;
   const el    = document.getElementById('adm-mem-list');
   if (!el || !admin) return;
   const churchId = admin.churchId || '';
-  const members  = LS.get('sda-members', []).filter(m => m.churchId === churchId);
-  if (!members.length) { el.innerHTML = '<div class="empty">No members registered for your church yet.</div>'; return; }
+  function _memHtml(members) {
+    if (!members.length) return '<div class="empty">No members registered for your church yet.</div>';
+    return members.map(m => {
+      var sid = (m.id||'').replace(/'/g,'&#39;');
+      return '<div class="mitm" style="display:flex;gap:10px;align-items:center">' +
+        '<div style="font-size:26px;flex-shrink:0">👤</div>' +
+        '<div style="flex:1;min-width:0">' +
+          '<div style="font-size:13px;font-weight:700;color:var(--text)">' + e(m.name) + '</div>' +
+          '<div style="font-size:11px;color:var(--text3)">' + e(m.phone||'') + (m.ministry?' &middot; '+e(m.ministry):'') + (m.role&&m.role!=='member'?' &middot; '+e(m.role):'') + '</div>' +
+          '<div style="font-size:10px;color:var(--text4)">Joined: ' + e(m.joinedAt||'') + '</div>' +
+        '</div>' +
+        '<button class="del-btn" onclick="removeMember(&#39;' + sid + '&#39;)" title="Remove member">🗑️</button>' +
+      '</div>';
+    }).join('');
+  }
+  const local = LS.get('sda-members', []).filter(m => m.churchId === churchId);
+  el.innerHTML = _memHtml(local);
+  _fbGetDocs('members', { churchId: churchId }).then(function(rows) {
+    const localIds = new Set(local.map(m => m.id));
+    rows.forEach(function(r) { if (!localIds.has(r.id)) local.push(r); });
+    const allLocal = LS.get('sda-members', []);
+    const allIds = new Set(allLocal.map(m => m.id));
+    rows.forEach(function(r) { if (!allIds.has(r.id)) allLocal.push(r); });
+    LS.set('sda-members', allLocal);
+    el.innerHTML = _memHtml(local);
+  }).catch(function() {});
+  if (false)
   el.innerHTML = members.map(m => `
     <div class="mitm" style="display:flex;gap:10px;align-items:center">
       <div style="font-size:26px;flex-shrink:0">👤</div>
@@ -9542,11 +9619,21 @@ function renderAdminMemberApproval() {
     </div>`).join('');
 }
 function removeMember(id) {
-  if (!confirm('Remove this member from your church?')) return;
+  if (window._removeMemberPending !== id) {
+    window._removeMemberPending = id;
+    setTimeout(function(){ window._removeMemberPending = null; }, 4000);
+    toast('⚠️ Tap Remove again to confirm', 4000);
+    return;
+  }
+  window._removeMemberPending = null;
   let members = LS.get('sda-members', []);
   const m = members.find(x => x.id === id);
   members = members.filter(x => x.id !== id);
   LS.set('sda-members', members);
+  // Remove from Firestore too
+  _fbGetDocs('members', { id: id }).then(function(rows) {
+    rows.forEach(function(r) { if (r._fbId) window._FBDB && window._FBDB.collection('members').doc(r._fbId).delete().catch(function(){}); });
+  }).catch(function(){});
   renderAdminMemberApproval();
   updStats();
   toast('Member removed.');
@@ -9872,6 +9959,15 @@ function rsvpActivity(actId, going) {
   LS.set('x-acts', acts);
   renderActs();
   toast(going ? '✅ RSVP confirmed!' : 'Removed from attendees');
+  // Sync RSVP to Firestore so admin and other members see attendance
+  if (window._FBDB && act.id) {
+    _fbGetDocs('activities', { id: act.id }).then(function(rows) {
+      if (rows.length && rows[0]._fbId) {
+        window._FBDB.collection('activities').doc(rows[0]._fbId)
+          .set({ rsvp: act.rsvp }, { merge: true }).catch(function() {});
+      }
+    }).catch(function() {});
+  }
 }
 
 /* ── Giving stubs (rendered by other functions) ──────────────────── */
@@ -10210,11 +10306,8 @@ function loadFirestoreTestimonies() {
   // Show local cache instantly
   renderTestimonies(LS.get(key, []).filter(t => !t.expiresAt || t.expiresAt > now));
   // Fetch from Firebase for cross-device sync
-  _fbGetDocs('testimonies').then(function(allRows) {
-    _fbPurgeExpired('testimonies', allRows);
-    var fbRows = allRows.filter(function(t){
-      return t.churchId === churchId || (t.church && makeChurchId(t.church) === churchId);
-    });
+  _fbGetDocs('testimonies', { churchId: churchId }).then(function(fbRows) {
+    _fbPurgeExpired('testimonies', fbRows);
     var localNow = LS.get(key, []);
     var fbIds = new Set(fbRows.map(function(r){ return r.id; }));
     localNow.forEach(function(r){ if (!fbIds.has(r.id)) fbRows.push(r); });
@@ -10235,13 +10328,28 @@ function renderTestimonies(items) {
 /* Resources */
 function renderResources() {
   const el = document.getElementById('res-list'); if (!el) return;
-  const all = LS.get('sda-resources', []);
-  if (!all.length) { el.innerHTML = '<div class="empty"><span class="empty-ico">📂</span><strong>No resources yet</strong><p>Admins can upload PDFs and guides from the Admin panel.</p></div>'; return; }
-  el.innerHTML = all.map(r =>
-    '<div class="res-card" onclick="downloadResource(\'' + r.id + '\')">' +
-    '<div class="res-ico">📄</div><div class="res-info"><h4>' + e(r.name) + '</h4>' +
-    '<div class="res-m">' + e(r.cat||'Resource') + '</div></div><div class="res-dl">⬇️</div></div>'
-  ).join('');
+  function _resHtml(all) {
+    if (!all.length) return '<div class="empty"><span class="empty-ico">📂</span><strong>No resources yet</strong><p>Admins can upload PDFs and guides from the Admin panel.</p></div>';
+    return all.map(function(r) {
+      var sid = (r.id||'').replace(/'/g,'&#39;');
+      return '<div class="res-card" onclick="downloadResource(\'' + sid + '\')">' +
+        '<div class="res-ico">📄</div><div class="res-info"><h4>' + e(r.name) + '</h4>' +
+        '<div class="res-m">' + e(r.cat||'Resource') + '</div></div><div class="res-dl">⬇️</div></div>';
+    }).join('');
+  }
+  const churchId = getChurchId();
+  const local = LS.get('sda-resources', []);
+  el.innerHTML = _resHtml(local);
+  // Fetch from Firestore so resources uploaded on other devices appear
+  _fbGetDocs('resources', { churchId: churchId }).then(function(rows) {
+    const localIds = new Set(local.map(function(r){ return r.id; }));
+    rows.forEach(function(r){ if (!localIds.has(r.id)) local.push(r); });
+    const allLocal = LS.get('sda-resources', []);
+    const allIds = new Set(allLocal.map(function(r){ return r.id; }));
+    rows.forEach(function(r){ if (!allIds.has(r.id)) allLocal.push(r); });
+    LS.set('sda-resources', allLocal);
+    el.innerHTML = _resHtml(local);
+  }).catch(function(){});
 }
 function downloadResource(id) {
   const res = LS.get('sda-resources', []).find(r => r.id === id);
