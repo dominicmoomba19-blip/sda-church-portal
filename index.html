@@ -80,8 +80,7 @@
 // script executes. This prevents "nav is not defined" errors on mobile.
 (function(){
   var PAGES=['home','devotional','activities','missions','about','media','library',
-    'recipes','health','stories','prayer','requests','live','admin','member','giving',
-    'attend','ministries','testimonies','prayerwall','sermons','resources','register-church','hymnal'];
+    'recipes','health','stories','prayer','requests','live','admin','member','ministries','testimonies','prayerwall','sermons','resources','register-church','hymnal'];
   function _nav(p){
     PAGES.forEach(function(id){
       var el=document.getElementById('page-'+id);
@@ -1480,7 +1479,7 @@ textarea.finp { resize:vertical; min-height:90px; }
       <div class="mc tb" onclick="nav('health')"><span class="mi">💚</span><div class="mt">Health Talks</div><div class="md">NEWSTART principles</div></div>
       <div class="mc tr" onclick="nav('stories')"><span class="mi">📖</span><div class="mt">Kids Stories</div><div class="md">Ages 3–12 · 25 stories</div></div>
       <div class="mc tb" onclick="nav('about')"><span class="mi">ℹ️</span><div class="mt">About</div><div class="md">Guide, conferences &amp; contact</div></div>
-      <div class="mc tr" onclick="nav('resources')"><span class="mi">📂</span><div class="mt">Resources</div><div class="md">PDFs &amp; bulletins</div></div>
+
     </div>
   </div>
   <div class="pg-footer">
@@ -3631,7 +3630,7 @@ function actMatchesDistrict(a){
 }
 
 /* ===== NAVIGATION ===== */
-const PAGES=['home','devotional','activities','missions','about','media','library','recipes','health','stories','prayer','requests','live','admin','member','giving','attend','ministries','testimonies','prayerwall','sermons','resources','register-church','camp-register','hymnal'];
+const PAGES=['home','devotional','activities','missions','about','media','library','recipes','health','stories','prayer','requests','live','admin','member','ministries','testimonies','prayerwall','sermons','resources','register-church','camp-register','hymnal'];
 const BN_MAP={home:'bn-home',devotional:'bn-devotional',media:'bn-media',prayer:'bn-prayer',prayerwall:'bn-prayer',member:'bn-member'};
 const TN_MAP={home:'tnb-home'};
 function nav(p){
@@ -8858,7 +8857,7 @@ window.toggleAcc=toggleAcc;
   }
   updateParallax();
 })();
-(function(){try{var s=JSON.parse(localStorage.getItem('sda-acc-state')||'{}');['worship','church','resources'].forEach(function(k){if(s[k]===undefined)return;var b=document.getElementById('acc-'+k);var d=document.getElementById('acc-body-'+k);if(!b||!d)return;b.classList.toggle('open',s[k]);d.classList.toggle('open',s[k]);b.setAttribute('aria-expanded',s[k]);});}catch(e){}})();
+(function(){try{var s=JSON.parse(localStorage.getItem('sda-acc-state')||'{}');['worship','church'].forEach(function(k){if(s[k]===undefined)return;var b=document.getElementById('acc-'+k);var d=document.getElementById('acc-body-'+k);if(!b||!d)return;b.classList.toggle('open',s[k]);d.classList.toggle('open',s[k]);b.setAttribute('aria-expanded',s[k]);});}catch(e){}})();
 /* ── IIFE internals needed by v5 member system ── */
 window._LS=LS;window._toast=toast;window._setErr=setErr;window._addLog=addLog;
 window._distById=distById;window._makeChurchId=makeChurchId;window._e=e;window._DISTRICTS=DISTRICTS;
@@ -9084,46 +9083,53 @@ function memRegister() {
   const regDist     = distById(regDistId);
   const regChurchId = makeChurchId(regChurch);
 
-  /* Duplicate check */
+  /* Duplicate check — local first */
   const members = LS.get('sda-members', []);
   if (members.find(m => m.phone === ph)) {
     setErr('m-reg-err', 'That phone number is already registered — please log in.');
     return;
   }
-
-  /* Build member record */
-  const hashed = hashPw(pw);
-  const nm = {
-    id:           'm' + Date.now(),
-    name:         n,
-    phone:        ph,
-    ministry:     min,
-    role:         rol,
-    church:       regChurch,
-    churchId:     regChurchId,
-    distId:       regDistId,
-    distName:     regDist ? regDist.name : '',
-    conf:         regConf,
-    passwordHash: hashed,
-    joinedAt:     new Date().toLocaleString(),
-    bookmarks:    [],
-    status:       'active'
-  };
-
-  members.push(nm);
-  LS.set('sda-members', members);
-
-  currentMember = nm;
-  LS.set('sda-member-session', { id: nm.id, phone: nm.phone });
-  syncMemberChurchContext(nm);
-
-  // Save to Firestore so member can log in from any device
-  _fbAdd('members', nm).catch(() => {});
-
-  renderMemberProfile();
-  toast('Welcome, ' + n + ' 🙏 Account created!');
-  addLog('Member registered: ' + n + ' @ ' + regChurch);
-  updStats();
+  const _regPath = (regConf === 'NZU' || regConf === 'SZU') ? 'conferences/' + regConf + '/members' : 'members';
+  if (!window._FBDB) { setErr('m-reg-err', 'Cannot reach server. Please check your connection.'); return; }
+  const _regBtn = document.getElementById('m-reg-btn');
+  if (_regBtn) { _regBtn.disabled = true; _regBtn.textContent = 'Checking…'; }
+  window._FBDB.collection(_regPath).where('phone', '==', ph).get()
+    .then(function(snap) {
+      if (!snap.empty) {
+        setErr('m-reg-err', 'That phone number is already registered — please log in.');
+        if (_regBtn) { _regBtn.disabled = false; _regBtn.textContent = '✅ Create Member Account'; }
+        return;
+      }
+      const hashed = hashPw(pw);
+      const nm = {
+        id: 'm' + Date.now(), name: n, phone: ph, ministry: min, role: rol,
+        church: regChurch, churchId: regChurchId, distId: regDistId,
+        distName: regDist ? regDist.name : '', conf: regConf,
+        passwordHash: hashed, joinedAt: new Date().toLocaleString(), bookmarks: [], status: 'active'
+      };
+      window._FBDB.collection(_regPath).add(nm)
+        .then(function() {
+          members.push(nm);
+          LS.set('sda-members', members);
+          try { localStorage.setItem('selectedConference', regConf); } catch(e) {}
+          currentMember = nm;
+          LS.set('sda-member-session', { id: nm.id, phone: nm.phone });
+          syncMemberChurchContext(nm);
+          renderMemberProfile();
+          if (_regBtn) { _regBtn.disabled = false; _regBtn.textContent = '✅ Create Member Account'; }
+          toast('Welcome, ' + n + ' 🙏 Account created!');
+          addLog('Member registered: ' + n + ' @ ' + regChurch);
+          updStats();
+        })
+        .catch(function() {
+          setErr('m-reg-err', 'Failed to save account. Please check your connection.');
+          if (_regBtn) { _regBtn.disabled = false; _regBtn.textContent = '✅ Create Member Account'; }
+        });
+    })
+    .catch(function() {
+      setErr('m-reg-err', 'Could not reach server. Please check your connection.');
+      if (_regBtn) { _regBtn.disabled = false; _regBtn.textContent = '✅ Create Member Account'; }
+    });
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -9169,15 +9175,24 @@ function memLogin() {
     return;
   }
 
-  // Not in localStorage — try Firestore (member registered on another device)
-  _fbGetDocs('members', { phone: u }).then(function(rows) {
-    const fbFound = rows.find(m => m.phone === u || (m.name||'').toLowerCase() === u.toLowerCase());
-    if (!fbFound) { setErr('m-login-err', 'No account found for that phone/username. Please register first.'); return; }
-    if (!checkPw(pw, fbFound.passwordHash)) { setErr('m-login-err', 'Incorrect password — please try again.'); return; }
-    _doMemLogin(fbFound);
-  }).catch(function() {
-    setErr('m-login-err', 'No account found locally and could not reach server. Please check your connection.');
-  });
+  // Not in localStorage — search all conference paths (new device has no selectedConference)
+  var _loginPaths = ['members', 'conferences/NZU/members', 'conferences/SZU/members'];
+  function _tryLoginPath(i) {
+    if (i >= _loginPaths.length) { setErr('m-login-err', 'No account found for that phone/username. Please register first.'); return; }
+    if (!window._FBDB) { setErr('m-login-err', 'Could not reach server. Please check your connection.'); return; }
+    window._FBDB.collection(_loginPaths[i]).where('phone', '==', u).get()
+      .then(function(snap) {
+        var rows = []; snap.forEach(function(d) { rows.push(Object.assign({}, d.data(), { _fbId: d.id })); });
+        var fbFound = rows.find(function(m) { return m.phone === u || (m.name||'').toLowerCase() === u.toLowerCase(); });
+        if (!fbFound) { _tryLoginPath(i + 1); return; }
+        if (!checkPw(pw, fbFound.passwordHash)) { setErr('m-login-err', 'Incorrect password — please try again.'); return; }
+        var conf = fbFound.conf || '';
+        if (conf === 'NZU' || conf === 'SZU') { try { localStorage.setItem('selectedConference', conf); } catch(e) {} }
+        _doMemLogin(fbFound);
+      })
+      .catch(function() { _tryLoginPath(i + 1); });
+  }
+  _tryLoginPath(0);
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -9195,21 +9210,27 @@ function loadMemberSession() {
     renderMemberProfile();
     return;
   }
-  // Not in localStorage (cleared or first load on new device) — try Firestore
-  _fbGetDocs('members', { id: sess.id }).then(function(rows) {
-    const fb = rows.find(function(m) { return m.id === sess.id && m.phone === sess.phone; });
-    if (!fb) { localStorage.removeItem('sda-member-session'); return; } // stale session
-    // Merge back into localStorage for faster future loads
-    const all = LS.get('sda-members', []);
-    if (!all.find(function(m) { return m.id === fb.id; })) all.push(fb);
-    LS.set('sda-members', all);
-    currentMember = fb;
-    syncMemberChurchContext(fb);
-    renderMemberProfile();
-  }).catch(function() {
-    // Firestore unreachable — silently leave session as-is; user will need to log in
-    localStorage.removeItem('sda-member-session');
-  });
+  // Not in localStorage — search all conference paths (new device has no selectedConference)
+  var _sessId = sess.id; var _sessPhone = sess.phone;
+  var _sessPaths = ['members', 'conferences/NZU/members', 'conferences/SZU/members'];
+  function _trySessionPath(i) {
+    if (i >= _sessPaths.length) { localStorage.removeItem('sda-member-session'); return; }
+    if (!window._FBDB) { localStorage.removeItem('sda-member-session'); return; }
+    window._FBDB.collection(_sessPaths[i]).where('phone', '==', _sessPhone).get()
+      .then(function(snap) {
+        var rows = []; snap.forEach(function(d) { rows.push(Object.assign({}, d.data(), { _fbId: d.id })); });
+        var fb = rows.find(function(m) { return m.id === _sessId && m.phone === _sessPhone; });
+        if (!fb) { _trySessionPath(i + 1); return; }
+        var conf = fb.conf || '';
+        if (conf === 'NZU' || conf === 'SZU') { try { localStorage.setItem('selectedConference', conf); } catch(e) {} }
+        var all = LS.get('sda-members', []);
+        if (!all.find(function(m) { return m.id === fb.id; })) all.push(fb);
+        LS.set('sda-members', all);
+        currentMember = fb; syncMemberChurchContext(fb); renderMemberProfile();
+      })
+      .catch(function() { _trySessionPath(i + 1); });
+  }
+  _trySessionPath(0);
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -10363,13 +10384,16 @@ function addAdminResource() {
   const url  = (document.getElementById('adm-res-url')?.value   || '').trim();
   const cat  =  document.getElementById('adm-res-cat')?.value   || 'Bulletin';
   if (!name || !url) { toast('Please enter a title and URL.'); return; }
+  const nr = { id:'res'+Date.now(), name, url, cat, church: admin.church||'', churchId: admin.churchId||'', uploadedAt: new Date().toLocaleDateString() };
   const all = LS.get('sda-resources', []);
-  all.push({ id:'res'+Date.now(), name, url, cat, church: admin.church||'', churchId: admin.churchId||'', uploadedAt: new Date().toLocaleDateString() });
+  all.push(nr);
   LS.set('sda-resources', all);
+  // Save to Firestore so resource appears on all devices
+  _fbSet('resources', nr.id, nr).catch(function(){});
   ['adm-res-title','adm-res-url'].forEach(id => { const x=document.getElementById(id); if(x) x.value=''; });
-  toast('✅ Resource added!');
+  toast('\u2705 Resource added!');
   const el = document.getElementById('adm-resources-list');
-  if (el) el.innerHTML = all.map(r => '<div class="mitm" style="display:flex;gap:8px;align-items:center"><div style="font-size:22px">📄</div><div style="flex:1"><div style="font-size:12px;font-weight:600">' + e(r.name) + '</div><div style="font-size:10px;color:var(--text3)">' + e(r.cat) + '</div></div></div>').join('');
+  if (el) el.innerHTML = all.map(r => '<div class="mitm" style="display:flex;gap:8px;align-items:center"><div style="font-size:22px">\ud83d\udcc4</div><div style="flex:1"><div style="font-size:12px;font-weight:600">' + e(r.name) + '</div><div style="font-size:10px;color:var(--text3)">' + e(r.cat) + '</div></div></div>').join('');
 }
 function delAdminResource(id) {
   LS.set('sda-resources', LS.get('sda-resources',[]).filter(r => r.id !== id));
@@ -11352,58 +11376,8 @@ function doRejectSubConfirmed(username) {
 </div>
 
 <!-- GIVING PAGE (stub - giving records shown in admin panel) -->
-<div class="page" id="page-giving">
-  <div class="sdiv" style="margin-bottom:4px">GIVING</div>
-  <h2 style="font-family:'Playfair Display',serif;font-size:22px;color:var(--gold2);margin-bottom:16px">Tithes &amp; Offerings</h2>
-  <div class="card" style="padding:18px;margin-bottom:12px">
-    <div class="sdiv" style="font-size:10px;margin-bottom:12px">💳 GIVE NOW</div>
-    <div style="display:flex;gap:9px;flex-wrap:wrap;margin-bottom:12px">
-      <button class="give-type btn" style="flex:1;padding:10px 0;font-size:12px" onclick="selectGiveType(this,'tithe')">⭐ Tithe</button>
-      <button class="give-type btn" style="flex:1;padding:10px 0;font-size:12px" onclick="selectGiveType(this,'offering')">🙏 Offering</button>
-      <button class="give-type btn" style="flex:1;padding:10px 0;font-size:12px" onclick="selectGiveType(this,'project')">🏗️ Project</button>
-    </div>
-    <div id="give-project-row" style="display:none;margin-bottom:12px">
-      <input type="text" placeholder="Project name..." style="width:100%;background:var(--bg2);border:1px solid var(--bor2);border-radius:10px;padding:11px 13px;color:var(--text);font-size:13px;outline:none">
-    </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
-      <button class="give-amt btn" style="flex:1;padding:9px 0;font-size:12px" onclick="selectGiveAmt(this,50)">K50</button>
-      <button class="give-amt btn" style="flex:1;padding:9px 0;font-size:12px" onclick="selectGiveAmt(this,100)">K100</button>
-      <button class="give-amt btn" style="flex:1;padding:9px 0;font-size:12px" onclick="selectGiveAmt(this,200)">K200</button>
-      <button class="give-amt btn" style="flex:1;padding:9px 0;font-size:12px" onclick="selectGiveAmt(this,500)">K500</button>
-    </div>
-    <input type="number" id="give-custom" placeholder="Custom amount (Kwacha)" oninput="clearGiveAmtSel()" style="width:100%;background:var(--bg2);border:1px solid var(--bor2);border-radius:10px;padding:11px 13px;color:var(--text);font-size:13px;outline:none;margin-bottom:10px">
-    <input type="text" id="give-name" placeholder="Your name (optional)" style="width:100%;background:var(--bg2);border:1px solid var(--bor2);border-radius:10px;padding:11px 13px;color:var(--text);font-size:13px;outline:none;margin-bottom:12px">
-    <button class="btn btn-em" style="width:100%;padding:13px;font-size:14px;font-weight:700;border-radius:11px" onclick="submitGiving()">💳 Record Giving</button>
-  </div>
-  <div class="sdiv" style="font-size:10px;margin-bottom:10px">GIVING HISTORY</div>
-  <div id="give-history"><div class="empty"><span class="empty-ico">💳</span><strong>No giving recorded yet</strong><p>Your giving history will appear here.</p></div></div>
-</div>
 
-<!-- ATTENDANCE PAGE -->
-<div class="page" id="page-attend">
-  <div class="sdiv" style="margin-bottom:4px">ATTENDANCE</div>
-  <h2 style="font-family:'Playfair Display',serif;font-size:22px;color:var(--gold2);margin-bottom:16px">Attendance Tracker</h2>
-  <div id="att-no-admin" class="card" style="padding:16px;margin-bottom:12px;border:1px solid rgba(232,80,80,.25);display:none">
-    <div style="font-size:13px;color:var(--crim3);font-weight:600;margin-bottom:4px">🔒 Admin Required</div>
-    <div style="font-size:12px;color:var(--text3)">Only a church admin can record official attendance. Log in as admin to access this feature.</div>
-  </div>
-  <div id="att-form-wrap">
-    <div class="card" style="padding:18px;margin-bottom:12px">
-      <div class="sdiv" style="font-size:10px;margin-bottom:12px">📋 RECORD ATTENDANCE</div>
-      <label style="font-size:11px;color:var(--text3);font-weight:700;display:block;margin-bottom:5px;letter-spacing:.5px;text-transform:uppercase">Date</label>
-      <input type="date" id="att-date" style="width:100%;background:var(--bg2);border:1px solid var(--bor2);border-radius:10px;padding:11px 13px;color:var(--text);font-size:13px;outline:none;margin-bottom:12px">
-      <label style="font-size:11px;color:var(--text3);font-weight:700;display:block;margin-bottom:5px;letter-spacing:.5px;text-transform:uppercase">Attendance Count</label>
-      <input type="number" id="att-count" placeholder="Number of attendees" min="0" style="width:100%;background:var(--bg2);border:1px solid var(--bor2);border-radius:10px;padding:11px 13px;color:var(--text);font-size:13px;outline:none;margin-bottom:12px">
-      <button class="btn btn-em" style="width:100%;padding:13px;font-size:14px;font-weight:700;border-radius:11px" onclick="recordAttendance()">✅ Record Attendance</button>
-    </div>
-    <div class="sdiv" style="font-size:10px;margin-bottom:10px">📊 ATTENDANCE CHART</div>
-    <div id="att-chart-wrap" class="card" style="padding:14px;margin-bottom:12px">
-      <div class="empty"><span class="empty-ico">📊</span><strong>No data yet</strong><p>Record attendance to see the chart.</p></div>
-    </div>
-    <div class="sdiv" style="font-size:10px;margin-bottom:10px">📋 RECENT RECORDS</div>
-    <div id="att-records"><div class="empty">No records yet.</div></div>
-  </div>
-</div>
+
 
 <!-- PWA INSTALL BANNER -->
 <div id="pwa-banner">
